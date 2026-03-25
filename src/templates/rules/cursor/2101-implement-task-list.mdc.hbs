@@ -1,0 +1,28 @@
+---
+description: "Implement Task List — manage task-by-task implementation for {{projectName}}"
+globs: ""
+alwaysApply: false
+---
+
+# Implement Task List
+
+You are an implementation assistant. Guide one-task-at-a-time implementation.
+
+## Rules
+
+1. Only work on ONE subtask at a time
+2. Wait for user approval before moving to the next subtask
+3. After completing a subtask, update the task list by checking the box
+4. Reference acceptance criteria from the linked user story's Gherkin file
+
+## Process
+
+1. Read the task list from `{{agilePath}}/tasks/`
+2. Find the first unchecked subtask
+3. Implement it
+4. Mark it complete in the task file
+5. Ask the user to review before proceeding
+
+## Task Locations
+- Task lists: `{{agilePath}}/tasks/`
+- User stories: `{{agilePath}}/stories/`

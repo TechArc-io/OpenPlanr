@@ -1,0 +1,68 @@
+{
+  "name": "openplanr",
+  "version": "0.1.0",
+  "description": "CLI tool for agile planning with AI agents — generates epics, features, stories, tasks, and AI rule files for Cursor, Claude Code, and Codex",
+  "type": "module",
+  "main": "./dist/cli/index.js",
+  "types": "./dist/cli/index.d.ts",
+  "bin": {
+    "planr": "./bin/planr.js",
+    "opr": "./bin/planr.js"
+  },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && cp -r src/templates dist/templates",
+    "dev": "tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "agile",
+    "planning",
+    "cli",
+    "cursor",
+    "claude",
+    "codex",
+    "ai",
+    "epic",
+    "user-story",
+    "scrum"
+  ],
+  "author": "OpenPlanr Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TechArc-io/OpenPlanr.git"
+  },
+  "homepage": "https://github.com/TechArc-io/OpenPlanr#readme",
+  "bugs": {
+    "url": "https://github.com/TechArc-io/OpenPlanr/issues"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "fs-extra": "^11.2.0",
+    "gray-matter": "^4.0.3",
+    "handlebars": "^4.7.8",
+    "ora": "^8.1.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

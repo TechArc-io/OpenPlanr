@@ -1,0 +1,24 @@
+---
+id: "{{id}}"
+title: "{{title}}"
+storyId: "{{storyId}}"
+created: "{{date}}"
+updated: "{{date}}"
+status: "pending"
+---
+
+# {{id}}: {{title}}
+
+**User Story:** [{{storyId}}](../stories/{{storyId}}.md)
+
+## Tasks
+
+{{#each tasks}}
+- [ ] **{{this.id}}** {{this.title}}
+{{#each this.subtasks}}
+  - [ ] {{this.id}} {{this.title}}
+{{/each}}
+{{/each}}
+
+## Notes
+_Mark tasks complete by checking the boxes above, or run `planr task implement {{id}}`._
