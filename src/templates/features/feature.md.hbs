@@ -10,7 +10,7 @@ status: "planning"
 
 # {{id}}: {{title}}
 
-**Epic:** [{{epicId}}](../epics/{{epicId}}.md)
+**Epic:** [{{epicId}}](../epics/{{epicFilename}}.md)
 
 ## Overview
 {{overview}}
@@ -23,7 +23,7 @@ status: "planning"
 ## User Stories
 {{#if storyIds}}
 {{#each storyIds}}
-- [{{this}}](../stories/{{this}}.md)
+- [{{this.id}}](../stories/{{this.filename}}.md)
 {{/each}}
 {{else}}
 _No user stories created yet. Run `planr story create --feature {{id}}` to create user stories._

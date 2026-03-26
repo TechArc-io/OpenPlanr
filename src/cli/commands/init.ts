@@ -1,18 +1,27 @@
+/**
+ * `planr init` command.
+ *
+ * Initializes a new Planr project with directory structure, config,
+ * and optional AI provider setup.
+ */
+
 import { Command } from 'commander';
 import path from 'node:path';
 import { createDefaultConfig, saveConfig } from '../../services/config-service.js';
 import { createChecklist } from '../../services/checklist-service.js';
-import { ensureDir } from '../../utils/fs.js';
-import { fileExists } from '../../utils/fs.js';
+import { saveCredential } from '../../services/credentials-service.js';
+import { ensureDir, fileExists } from '../../utils/fs.js';
 import { CONFIG_FILENAME, ARTIFACT_DIRS } from '../../utils/constants.js';
 import { logger } from '../../utils/logger.js';
-import { promptText, promptConfirm } from '../../services/prompt-service.js';
+import { promptText, promptConfirm, promptSelect, promptSecret } from '../../services/prompt-service.js';
+import type { AIProviderName, CodingAgentName } from '../../models/types.js';
 
 export function registerInitCommand(program: Command) {
   program
     .command('init')
     .description('Initialize Planr in the current project')
     .option('--name <name>', 'project name')
+    .option('--no-ai', 'skip AI setup')
     .action(async (opts) => {
       const projectDir = program.opts().projectDir as string;
       const configPath = path.join(projectDir, CONFIG_FILENAME);
@@ -33,12 +42,48 @@ export function registerInitCommand(program: Command) {
 
       const config = createDefaultConfig(projectName);
 
+      // --- AI Provider Setup ---
+      if (opts.ai !== false) {
+        const enableAI = await promptConfirm('Enable AI-powered planning?', true);
+
+        if (enableAI) {
+          const provider = await promptSelect<AIProviderName>('AI provider:', [
+            { name: 'Anthropic (Claude)', value: 'anthropic' },
+            { name: 'OpenAI (GPT-4o)', value: 'openai' },
+            { name: 'Ollama (Local — free, no API key)', value: 'ollama' },
+          ]);
+
+          config.ai = { provider };
+
+          // Collect API key for cloud providers
+          if (provider === 'anthropic' || provider === 'openai') {
+            const keyHint = provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+            const apiKey = await promptSecret(
+              `API key (or press Enter to set ${keyHint} env var later):`
+            );
+            if (apiKey.trim()) {
+              await saveCredential(provider, apiKey.trim());
+              logger.success(`API key saved to ~/.planr/credentials.json`);
+            } else {
+              logger.dim(`  No key provided. Set ${keyHint} env var or run \`planr config set-key ${provider}\`.`);
+            }
+          }
+
+          // Coding agent preference
+          const agent = await promptSelect<CodingAgentName>('Default coding agent:', [
+            { name: 'Claude Code CLI', value: 'claude' },
+            { name: 'Cursor', value: 'cursor' },
+            { name: 'Codex', value: 'codex' },
+          ]);
+          config.defaultAgent = agent;
+        }
+      }
+
       // Create directory structure
       const agileDir = path.join(projectDir, config.outputPaths.agile);
       for (const dir of Object.values(ARTIFACT_DIRS)) {
         await ensureDir(path.join(agileDir, dir));
       }
-      // Also create diagrams dir
       await ensureDir(path.join(agileDir, 'diagrams'));
 
       // Save config
@@ -46,16 +91,23 @@ export function registerInitCommand(program: Command) {
       logger.success(`Created ${CONFIG_FILENAME}`);
 
       // Create checklist
-      const checklistPath = await createChecklist(projectDir, config);
+      await createChecklist(projectDir, config);
       logger.success(`Created agile development checklist`);
 
+      // Summary
       logger.heading('Planr initialized!');
       logger.info(`Project: ${projectName}`);
       logger.info(`Artifacts: ${config.outputPaths.agile}/`);
+
+      if (config.ai) {
+        logger.info(`AI: ${config.ai.provider} (every command is AI-powered)`);
+        logger.info(`Agent: ${config.defaultAgent || 'claude'}`);
+      }
+
       logger.dim('');
       logger.dim('Next steps:');
       logger.dim('  planr epic create        — Create your first epic');
       logger.dim('  planr rules generate     — Generate AI agent rules');
-      logger.dim('  planr checklist show      — View the agile checklist');
+      logger.dim('  planr config show        — View configuration');
     });
 }

@@ -16,6 +16,10 @@ Handlebars.registerHelper('checkboxList', (items: string[]) => {
   return items.map((item) => `- [ ] ${item}`).join('\n');
 });
 
+Handlebars.registerHelper('join', (arr: string[], sep: unknown) =>
+  Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : ''
+);
+
 export async function renderTemplate(
   templatePath: string,
   data: Record<string, unknown>,

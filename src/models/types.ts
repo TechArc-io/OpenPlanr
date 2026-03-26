@@ -1,6 +1,14 @@
 export type ArtifactType = 'epic' | 'feature' | 'story' | 'task' | 'adr' | 'checklist';
 export type TargetCLI = 'cursor' | 'claude' | 'codex';
 export type TaskStatus = 'pending' | 'in-progress' | 'done';
+export type AIProviderName = 'anthropic' | 'openai' | 'ollama';
+export type CodingAgentName = 'claude' | 'cursor' | 'codex';
+
+export interface AIConfig {
+  provider: AIProviderName;
+  model?: string;
+  ollamaBaseUrl?: string;
+}
 
 export interface OpenPlanrConfig {
   projectName: string;
@@ -17,6 +25,8 @@ export interface OpenPlanrConfig {
     story: string;
     task: string;
   };
+  ai?: AIConfig;
+  defaultAgent?: CodingAgentName;
   templateOverrides?: string;
   author?: string;
   createdAt: string;

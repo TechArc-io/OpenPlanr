@@ -1,4 +1,4 @@
-import { input, select, confirm, editor } from '@inquirer/prompts';
+import { input, password, select, confirm, editor } from '@inquirer/prompts';
 
 export async function promptText(message: string, defaultValue?: string): Promise<string> {
   return input({ message, default: defaultValue });
@@ -17,6 +17,10 @@ export async function promptConfirm(message: string, defaultValue = true): Promi
 
 export async function promptEditor(message: string, defaultValue?: string): Promise<string> {
   return editor({ message, default: defaultValue });
+}
+
+export async function promptSecret(message: string): Promise<string> {
+  return password({ message, mask: '*' });
 }
 
 export async function promptMultiText(message: string, hint?: string): Promise<string[]> {

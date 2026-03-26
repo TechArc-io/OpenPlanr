@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
 export const targetCLISchema = z.enum(['cursor', 'claude', 'codex']);
+export const aiProviderSchema = z.enum(['anthropic', 'openai', 'ollama']);
+export const codingAgentSchema = z.enum(['claude', 'cursor', 'codex']);
+
+export const aiConfigSchema = z.object({
+  provider: aiProviderSchema,
+  model: z.string().optional(),
+  ollamaBaseUrl: z.string().optional(),
+});
 
 export const configSchema = z.object({
   projectName: z.string().min(1),
@@ -17,6 +25,8 @@ export const configSchema = z.object({
     story: z.string().default('US'),
     task: z.string().default('TASK'),
   }),
+  ai: aiConfigSchema.optional(),
+  defaultAgent: codingAgentSchema.optional(),
   templateOverrides: z.string().optional(),
   author: z.string().optional(),
   createdAt: z.string(),
