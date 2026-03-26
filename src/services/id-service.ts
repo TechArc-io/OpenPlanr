@@ -3,15 +3,19 @@ import { listFiles } from '../utils/fs.js';
 
 export async function getNextId(dir: string, prefix: string): Promise<string> {
   const files = await listFiles(dir, new RegExp(`^${prefix}-\\d{3}`));
-  let maxId = 0;
+  const usedNums = new Set<number>();
   for (const file of files) {
     const match = file.match(new RegExp(`^${prefix}-(\\d{3})`));
     if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxId) maxId = num;
+      usedNums.add(parseInt(match[1], 10));
     }
   }
-  const nextNum = (maxId + 1).toString().padStart(3, '0');
+  // Find the first available gap starting from 1
+  let next = 1;
+  while (usedNums.has(next)) {
+    next++;
+  }
+  const nextNum = next.toString().padStart(3, '0');
   return `${prefix}-${nextNum}`;
 }
 
