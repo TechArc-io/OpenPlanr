@@ -1,6 +1,6 @@
 {
   "name": "openplanr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI tool for agile planning with AI agents — generates epics, features, stories, tasks, and AI rule files for Cursor, Claude Code, and Codex",
   "type": "module",
   "main": "./dist/cli/index.js",
@@ -16,7 +16,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && cp -r src/templates dist/templates",
+    "build": "tsc && rm -rf dist/templates && cp -r src/templates dist/templates",
     "dev": "tsx src/cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -49,12 +49,14 @@
     "url": "https://github.com/TechArc-io/OpenPlanr/issues"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@inquirer/prompts": "^7.0.0",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "fs-extra": "^11.2.0",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.8",
+    "openai": "^4.77.0",
     "ora": "^8.1.0",
     "zod": "^3.23.0"
   },
