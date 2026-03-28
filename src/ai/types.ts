@@ -52,7 +52,6 @@ export const TOKEN_BUDGETS = {
   task: 16384,
   taskFeature: 32768,
   refine: 8192,
-  plan: 16384,
 } as const;
 
 export interface AIProvider {
