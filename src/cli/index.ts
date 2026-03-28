@@ -1,17 +1,17 @@
 import { Command } from 'commander';
 import { setVerbose } from '../utils/logger.js';
-import { registerInitCommand } from './commands/init.js';
+import { registerChecklistCommand } from './commands/checklist.js';
+import { registerConfigCommand } from './commands/config.js';
 import { registerEpicCommand } from './commands/epic.js';
 import { registerFeatureCommand } from './commands/feature.js';
-import { registerStoryCommand } from './commands/story.js';
-import { registerTaskCommand } from './commands/task.js';
-import { registerChecklistCommand } from './commands/checklist.js';
+import { registerInitCommand } from './commands/init.js';
+import { registerPlanCommand } from './commands/plan.js';
+import { registerRefineCommand } from './commands/refine.js';
 import { registerRulesCommand } from './commands/rules.js';
 import { registerStatusCommand } from './commands/status.js';
-import { registerConfigCommand } from './commands/config.js';
-import { registerRefineCommand } from './commands/refine.js';
-import { registerPlanCommand } from './commands/plan.js';
+import { registerStoryCommand } from './commands/story.js';
 import { registerSyncCommand } from './commands/sync.js';
+import { registerTaskCommand } from './commands/task.js';
 
 const program = new Command();
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AIError } from '../../src/ai/errors.js';
 
 // Mock the provider modules with proper class constructors
@@ -6,7 +6,7 @@ vi.mock('../../src/ai/providers/anthropic-provider.js', () => ({
   AnthropicProvider: class {
     name = 'anthropic';
     model: string;
-    constructor(apiKey: string, model?: string) {
+    constructor(_apiKey: string, model?: string) {
       this.model = model || 'claude-sonnet-4-20250514';
     }
   },
@@ -16,7 +16,7 @@ vi.mock('../../src/ai/providers/openai-provider.js', () => ({
   OpenAIProvider: class {
     name = 'openai';
     model: string;
-    constructor(apiKey: string, model?: string) {
+    constructor(_apiKey: string, model?: string) {
       this.model = model || 'gpt-4o';
     }
   },

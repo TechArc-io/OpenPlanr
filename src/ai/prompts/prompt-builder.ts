@@ -13,15 +13,12 @@ import type { AIMessage } from '../types.js';
 import {
   EPIC_SYSTEM_PROMPT,
   FEATURES_SYSTEM_PROMPT,
+  REFINE_SYSTEM_PROMPT,
   STORIES_SYSTEM_PROMPT,
   TASKS_SYSTEM_PROMPT,
-  REFINE_SYSTEM_PROMPT,
 } from './system-prompts.js';
 
-export function buildEpicPrompt(
-  brief: string,
-  existingEpics: string[] = []
-): AIMessage[] {
+export function buildEpicPrompt(brief: string, existingEpics: string[] = []): AIMessage[] {
   let userContent = `Create an epic from this brief:\n\n"${brief}"`;
 
   if (existingEpics.length > 0) {
@@ -37,7 +34,7 @@ export function buildEpicPrompt(
 export function buildFeaturesPrompt(
   epicContent: string,
   existingFeatures: string[] = [],
-  featureCount?: number
+  featureCount?: number,
 ): AIMessage[] {
   let userContent = `Decompose this epic into features:\n\n${epicContent}`;
 
@@ -58,7 +55,7 @@ export function buildFeaturesPrompt(
 export function buildStoriesPrompt(
   featureContent: string,
   epicContext: string,
-  existingStories: string[] = []
+  existingStories: string[] = [],
 ): AIMessage[] {
   let userContent = `Generate user stories for this feature:\n\n${featureContent}`;
   userContent += `\n\n--- Parent Epic Context ---\n${epicContext}`;
@@ -127,7 +124,7 @@ export function buildTasksPrompt(ctx: TasksPromptInput): AIMessage[] {
   // Add scope hint so the AI titles the task list correctly
   if (ctx.scope) {
     sections.push(
-      `\n--- Scope ---\nThis task list is being generated at ${ctx.scope.type} level for ${ctx.scope.id}. Title the task list as "Tasks for ${ctx.scope.id}: <descriptive name>".`
+      `\n--- Scope ---\nThis task list is being generated at ${ctx.scope.type} level for ${ctx.scope.id}. Title the task list as "Tasks for ${ctx.scope.id}: <descriptive name>".`,
     );
   }
 
@@ -142,7 +139,7 @@ export function buildTasksPrompt(ctx: TasksPromptInput): AIMessage[] {
 export function buildRefinePrompt(
   artifactContent: string,
   artifactType: string,
-  parentContext?: { type: string; content: string }
+  parentContext?: { type: string; content: string },
 ): AIMessage[] {
   let userContent = `Review and improve this ${artifactType} artifact. The "improvedMarkdown" in your response must preserve the same file format (YAML frontmatter + markdown body) as shown below:\n\n${artifactContent}`;
 

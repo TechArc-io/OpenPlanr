@@ -19,7 +19,7 @@ export class AIError extends Error {
     public readonly code: AIErrorCode,
     public readonly retryable: boolean = false,
     public readonly retryAfterMs?: number,
-    public readonly cause?: unknown
+    public readonly cause?: unknown,
   ) {
     super(message);
     this.name = 'AIError';
@@ -54,13 +54,14 @@ export function wrapProviderError(err: unknown, provider: string): AIError {
   const error = err as Record<string, unknown>;
   const status = error?.status as number | undefined;
   const code = error?.code as string | undefined;
-  const message = error?.message as string || String(err);
+  const message = (error?.message as string) || String(err);
 
   // Connection errors (Ollama not running, network down)
   if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ETIMEDOUT') {
-    const hint = provider === 'ollama'
-      ? 'Is Ollama running? Start with `ollama serve`.'
-      : 'Check your internet connection.';
+    const hint =
+      provider === 'ollama'
+        ? 'Is Ollama running? Start with `ollama serve`.'
+        : 'Check your internet connection.';
     return new AIError(`Connection failed: ${hint}`, 'connection', true, 5000, err);
   }
 

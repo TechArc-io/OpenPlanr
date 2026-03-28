@@ -1,5 +1,5 @@
-export type { CodingAgent, AgentOptions, AgentResult } from './types.js';
 export { createAgent } from './agent-factory.js';
-export { parseTaskMarkdown, findSubtasks, getNextPending } from './task-parser.js';
-export { composeImplementationPrompt } from './prompt-composer.js';
 export { executeImplementation } from './implementation-bridge.js';
+export { composeImplementationPrompt } from './prompt-composer.js';
+export { findSubtasks, getNextPending, parseTaskMarkdown } from './task-parser.js';
+export type { AgentOptions, AgentResult, CodingAgent } from './types.js';

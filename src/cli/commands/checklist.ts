@@ -1,18 +1,18 @@
-import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
+import chalk from 'chalk';
+import type { Command } from 'commander';
 import {
-  readChecklist,
-  resetChecklist,
   createChecklist,
   getChecklistPath,
-  parseChecklistItems,
-  toggleChecklistItems,
   getChecklistProgress,
+  parseChecklistItems,
+  readChecklist,
+  resetChecklist,
+  toggleChecklistItems,
 } from '../../services/checklist-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptCheckbox } from '../../services/prompt-service.js';
 import { writeFile } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
 
 export function registerChecklistCommand(program: Command) {
   const checklist = program
@@ -76,7 +76,10 @@ export function registerChecklistCommand(program: Command) {
         checked: item.done,
       }));
 
-      const selected = await promptCheckbox('Toggle checklist items (space to toggle, enter to confirm):', choices);
+      const selected = await promptCheckbox(
+        'Toggle checklist items (space to toggle, enter to confirm):',
+        choices,
+      );
       const selectedSet = new Set(selected.map(Number));
 
       // Find items that changed: were checked but now unchecked, or vice versa

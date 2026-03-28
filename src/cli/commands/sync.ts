@@ -8,19 +8,18 @@
  *   - Reports all fixes
  */
 
-import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
+import chalk from 'chalk';
+import type { Command } from 'commander';
+import type { ArtifactType, OpenPlanrConfig } from '../../models/types.js';
 import {
   listArtifacts,
   readArtifact,
   readArtifactRaw,
-  updateArtifact,
   resolveArtifactFilename,
-  getArtifactDir,
+  updateArtifact,
 } from '../../services/artifact-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
-import type { OpenPlanrConfig, ArtifactType } from '../../models/types.js';
 
 export function registerSyncCommand(program: Command) {
   program
@@ -90,7 +89,7 @@ interface SyncOptions {
 async function syncParentChildLinks(
   projectDir: string,
   config: OpenPlanrConfig,
-  opts: SyncOptions
+  opts: SyncOptions,
 ): Promise<number> {
   const parents = await listArtifacts(projectDir, config, opts.parentType);
   const children = await listArtifacts(projectDir, config, opts.childType);
@@ -202,7 +201,7 @@ async function syncParentChildLinks(
       correctIds,
       childTitleMap,
       opts.parentType,
-      parent.id
+      parent.id,
     );
 
     const updated = replaceSection(parentRaw, opts.sectionHeading, newSection);
@@ -242,7 +241,7 @@ async function buildLinksSection(
   childIds: string[],
   titleMap: Map<string, string>,
   parentType: ArtifactType,
-  parentId: string
+  parentId: string,
 ): Promise<string> {
   if (childIds.length === 0) {
     const dirMap: Record<string, string> = {
@@ -288,5 +287,5 @@ function replaceSection(markdown: string, sectionHeading: string, newContent: st
     after = afterSection.slice(nextHeadingMatch.index);
   }
 
-  return before + '\n' + newContent + '\n' + after;
+  return `${before}\n${newContent}\n${after}`;
 }

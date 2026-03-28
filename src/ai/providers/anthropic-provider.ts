@@ -5,9 +5,9 @@
  * Lazily imported to avoid loading the SDK until actually needed.
  */
 
-import type { AIProvider, AIMessage, AIRequestOptions, AIProviderName, AIUsage } from '../types.js';
-import { DEFAULT_MAX_TOKENS } from '../types.js';
 import { wrapProviderError } from '../errors.js';
+import type { AIMessage, AIProvider, AIProviderName, AIRequestOptions, AIUsage } from '../types.js';
+import { DEFAULT_MAX_TOKENS } from '../types.js';
 
 export class AnthropicProvider implements AIProvider {
   readonly name: AIProviderName = 'anthropic';
@@ -43,10 +43,7 @@ export class AnthropicProvider implements AIProvider {
       });
 
       for await (const event of stream) {
-        if (
-          event.type === 'content_block_delta' &&
-          event.delta.type === 'text_delta'
-        ) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           yield event.delta.text;
         }
       }

@@ -63,13 +63,17 @@ const DETECTORS: StackDetector[] = [
   {
     file: 'go.mod',
     detect: async (content) => {
-      const moduleMatch = content.match(/^module\s+(.+)$/m);
+      const _moduleMatch = content.match(/^module\s+(.+)$/m);
       const deps = [...content.matchAll(/^\t(\S+)\s/gm)].map((m) => m[1]).slice(0, 20);
       return {
         language: 'Go',
-        framework: deps.find((d) => d.includes('gin')) ? 'Gin' :
-                   deps.find((d) => d.includes('fiber')) ? 'Fiber' :
-                   deps.find((d) => d.includes('echo')) ? 'Echo' : undefined,
+        framework: deps.find((d) => d.includes('gin'))
+          ? 'Gin'
+          : deps.find((d) => d.includes('fiber'))
+            ? 'Fiber'
+            : deps.find((d) => d.includes('echo'))
+              ? 'Echo'
+              : undefined,
         packageManager: 'go modules',
         dependencies: deps,
         devDependencies: [],
@@ -79,12 +83,20 @@ const DETECTORS: StackDetector[] = [
   {
     file: 'requirements.txt',
     detect: async (content) => {
-      const deps = content.split('\n').filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split('==')[0].split('>=')[0].trim()).slice(0, 20);
+      const deps = content
+        .split('\n')
+        .filter((l) => l.trim() && !l.startsWith('#'))
+        .map((l) => l.split('==')[0].split('>=')[0].trim())
+        .slice(0, 20);
       return {
         language: 'Python',
-        framework: deps.find((d) => d === 'django') ? 'Django' :
-                   deps.find((d) => d === 'flask') ? 'Flask' :
-                   deps.find((d) => d === 'fastapi') ? 'FastAPI' : undefined,
+        framework: deps.find((d) => d === 'django')
+          ? 'Django'
+          : deps.find((d) => d === 'flask')
+            ? 'Flask'
+            : deps.find((d) => d === 'fastapi')
+              ? 'FastAPI'
+              : undefined,
         packageManager: 'pip',
         dependencies: deps,
         devDependencies: [],
@@ -94,12 +106,18 @@ const DETECTORS: StackDetector[] = [
   {
     file: 'pyproject.toml',
     detect: async (content) => {
-      const deps = [...content.matchAll(/"([a-zA-Z][\w-]*)(?:[><=!]|")/g)].map((m) => m[1]).slice(0, 20);
+      const deps = [...content.matchAll(/"([a-zA-Z][\w-]*)(?:[><=!]|")/g)]
+        .map((m) => m[1])
+        .slice(0, 20);
       return {
         language: 'Python',
-        framework: deps.find((d) => d === 'django') ? 'Django' :
-                   deps.find((d) => d === 'flask') ? 'Flask' :
-                   deps.find((d) => d === 'fastapi') ? 'FastAPI' : undefined,
+        framework: deps.find((d) => d === 'django')
+          ? 'Django'
+          : deps.find((d) => d === 'flask')
+            ? 'Flask'
+            : deps.find((d) => d === 'fastapi')
+              ? 'FastAPI'
+              : undefined,
         packageManager: content.includes('[tool.poetry]') ? 'poetry' : 'pip',
         dependencies: deps,
         devDependencies: [],
@@ -109,12 +127,19 @@ const DETECTORS: StackDetector[] = [
   {
     file: 'Cargo.toml',
     detect: async (content) => {
-      const deps = [...content.matchAll(/^(\w[\w-]*)\s*=/gm)].map((m) => m[1]).filter((d) => d !== 'name' && d !== 'version' && d !== 'edition').slice(0, 20);
+      const deps = [...content.matchAll(/^(\w[\w-]*)\s*=/gm)]
+        .map((m) => m[1])
+        .filter((d) => d !== 'name' && d !== 'version' && d !== 'edition')
+        .slice(0, 20);
       return {
         language: 'Rust',
-        framework: deps.find((d) => d === 'actix-web') ? 'Actix' :
-                   deps.find((d) => d === 'axum') ? 'Axum' :
-                   deps.find((d) => d === 'rocket') ? 'Rocket' : undefined,
+        framework: deps.find((d) => d === 'actix-web')
+          ? 'Actix'
+          : deps.find((d) => d === 'axum')
+            ? 'Axum'
+            : deps.find((d) => d === 'rocket')
+              ? 'Rocket'
+              : undefined,
         packageManager: 'cargo',
         dependencies: deps,
         devDependencies: [],
@@ -130,9 +155,7 @@ export async function detectTechStack(projectDir: string): Promise<TechStack | n
       try {
         const content = await readFile(filePath);
         return await detector.detect(content, projectDir);
-      } catch {
-        continue;
-      }
+      } catch {}
     }
   }
   return null;

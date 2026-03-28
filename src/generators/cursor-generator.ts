@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { BaseGenerator } from './base-generator.js';
-import { renderTemplate } from '../services/template-service.js';
 import type { ArtifactCollection, GeneratedFile } from '../models/types.js';
+import { renderTemplate } from '../services/template-service.js';
+import { BaseGenerator } from './base-generator.js';
 
 const CURSOR_RULE_TEMPLATES = [
   '2000-agile-checklist.mdc.hbs',
@@ -32,7 +32,7 @@ export class CursorGenerator extends BaseGenerator {
       const content = await renderTemplate(
         `rules/cursor/${template}`,
         data,
-        this.config.templateOverrides
+        this.config.templateOverrides,
       );
       const outputName = template.replace('.hbs', '');
       files.push({

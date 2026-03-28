@@ -6,8 +6,8 @@
  */
 
 import { spawn } from 'node:child_process';
+import type { AgentOptions, AgentResult, CodingAgent } from './types.js';
 import { which } from './utils.js';
-import type { CodingAgent, AgentOptions, AgentResult } from './types.js';
 
 export class ClaudeAgent implements CodingAgent {
   readonly name = 'claude';

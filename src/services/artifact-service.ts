@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { ensureDir, writeFile, readFile, listFiles } from '../utils/fs.js';
-import { slugify } from '../utils/slugify.js';
+import type { ArtifactType, OpenPlanrConfig } from '../models/types.js';
+import { ensureDir, listFiles, readFile, writeFile } from '../utils/fs.js';
+import { logger } from '../utils/logger.js';
 import { parseMarkdown } from '../utils/markdown.js';
+import { slugify } from '../utils/slugify.js';
 import { getNextId } from './id-service.js';
 import { renderTemplate } from './template-service.js';
-import { logger } from '../utils/logger.js';
-import type { OpenPlanrConfig, ArtifactType } from '../models/types.js';
 
 const ARTIFACT_DIR_MAP: Record<string, string> = {
   epic: 'epics',
@@ -25,7 +25,7 @@ export async function createArtifact(
   config: OpenPlanrConfig,
   type: ArtifactType,
   templateFile: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<{ id: string; filePath: string }> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   await ensureDir(dir);
@@ -38,12 +38,16 @@ export async function createArtifact(
   const filename = `${id}-${slug}.md`;
   const filePath = path.join(dir, filename);
 
-  const content = await renderTemplate(templateFile, {
-    ...data,
-    id,
-    date: new Date().toISOString().split('T')[0],
-    projectName: config.projectName,
-  }, config.templateOverrides);
+  const content = await renderTemplate(
+    templateFile,
+    {
+      ...data,
+      id,
+      date: new Date().toISOString().split('T')[0],
+      projectName: config.projectName,
+    },
+    config.templateOverrides,
+  );
 
   await writeFile(filePath, content);
   logger.debug(`Created ${type} artifact: ${id} → ${filePath}`);
@@ -53,7 +57,7 @@ export async function createArtifact(
 export async function listArtifacts(
   projectDir: string,
   config: OpenPlanrConfig,
-  type: ArtifactType
+  type: ArtifactType,
 ): Promise<Array<{ id: string; title: string; filename: string }>> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   const files = await listFiles(dir, /\.md$/);
@@ -76,7 +80,7 @@ export async function readArtifact(
   projectDir: string,
   config: OpenPlanrConfig,
   type: ArtifactType,
-  id: string
+  id: string,
 ): Promise<{ data: Record<string, unknown>; content: string; filePath: string } | null> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   const files = await listFiles(dir, new RegExp(`^${id}-.*\\.md$`));
@@ -97,7 +101,7 @@ export async function readArtifactRaw(
   projectDir: string,
   config: OpenPlanrConfig,
   type: ArtifactType,
-  id: string
+  id: string,
 ): Promise<string | null> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   const files = await listFiles(dir, new RegExp(`^${id}-.*\\.md$`));
@@ -114,7 +118,7 @@ export async function updateArtifact(
   config: OpenPlanrConfig,
   type: ArtifactType,
   id: string,
-  content: string
+  content: string,
 ): Promise<void> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   const files = await listFiles(dir, new RegExp(`^${id}-.*\\.md$`));
@@ -133,7 +137,7 @@ export async function resolveArtifactFilename(
   projectDir: string,
   config: OpenPlanrConfig,
   type: ArtifactType,
-  id: string
+  id: string,
 ): Promise<string> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
   const files = await listFiles(dir, new RegExp(`^${id}-.*\\.md$`));
@@ -158,7 +162,7 @@ export async function addChildReference(
   parentId: string,
   childType: ArtifactType,
   childId: string,
-  childTitle: string
+  childTitle: string,
 ): Promise<void> {
   const parentRaw = await readArtifactRaw(projectDir, config, parentType, parentId);
   if (!parentRaw) return;
@@ -236,7 +240,7 @@ export async function getParentChain(
   projectDir: string,
   config: OpenPlanrConfig,
   type: ArtifactType,
-  id: string
+  id: string,
 ): Promise<{
   epic?: { data: Record<string, unknown>; content: string };
   feature?: { data: Record<string, unknown>; content: string };

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadConfig, saveConfig, createDefaultConfig } from '../../src/services/config-service.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDefaultConfig, loadConfig, saveConfig } from '../../src/services/config-service.js';
 
 vi.mock('../../src/utils/fs.js', () => ({
   fileExists: vi.fn(),
@@ -8,6 +8,7 @@ vi.mock('../../src/utils/fs.js', () => ({
 }));
 
 import { fileExists, readFile, writeFile } from '../../src/utils/fs.js';
+
 const mockFileExists = vi.mocked(fileExists);
 const mockReadFile = vi.mocked(readFile);
 const mockWriteFile = vi.mocked(writeFile);

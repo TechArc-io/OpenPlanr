@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the backends so tests don't depend on real keychain/files
 vi.mock('../../src/services/credential-backends.js', () => ({
@@ -21,16 +21,13 @@ vi.mock('../../src/services/credential-backends.js', () => ({
   },
 }));
 
+import { encryptedFileBackend, keychainBackend } from '../../src/services/credential-backends.js';
 import {
+  _resetMigration,
   resolveApiKey,
   resolveApiKeySource,
   saveCredential,
-  _resetMigration,
 } from '../../src/services/credentials-service.js';
-import {
-  keychainBackend,
-  encryptedFileBackend,
-} from '../../src/services/credential-backends.js';
 
 beforeEach(() => {
   _resetMigration();

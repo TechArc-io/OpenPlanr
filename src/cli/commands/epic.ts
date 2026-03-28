@@ -6,16 +6,21 @@
  * interactive prompt flow.
  */
 
-import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
-import { createArtifact, listArtifacts, resolveArtifactFilename } from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
-import { promptText, promptMultiText, promptSelect, promptEditor } from '../../services/prompt-service.js';
+import chalk from 'chalk';
+import type { Command } from 'commander';
 import { buildEpicPrompt } from '../../ai/prompts/prompt-builder.js';
 import { aiEpicResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
 import { TOKEN_BUDGETS } from '../../ai/types.js';
+import { generateStreamingJSON, getAIProvider, isAIConfigured } from '../../services/ai-service.js';
+import { createArtifact, listArtifacts } from '../../services/artifact-service.js';
+import { loadConfig } from '../../services/config-service.js';
+import {
+  promptEditor,
+  promptMultiText,
+  promptSelect,
+  promptText,
+} from '../../services/prompt-service.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
 
 export function registerEpicCommand(program: Command) {
   const epic = program.command('epic').description('Manage epics');
@@ -35,7 +40,9 @@ export function registerEpicCommand(program: Command) {
         await createEpicWithAI(projectDir, config, opts);
       } else {
         if (!opts.manual && !isAIConfigured(config)) {
-          logger.warn('AI not configured. Using manual mode. Run `planr config set-provider` to enable AI.');
+          logger.warn(
+            'AI not configured. Using manual mode. Run `planr config set-provider` to enable AI.',
+          );
         }
         await createEpicManually(projectDir, config, opts);
       }
@@ -83,7 +90,9 @@ function displayEpic(epicData: DisplayableEpic) {
   console.log(`  Problem:          ${epicData.problemStatement}`);
   console.log(`  Solution:         ${epicData.solutionOverview}`);
   console.log(`  Success Criteria:`);
-  const criteria = Array.isArray(epicData.successCriteria) ? epicData.successCriteria : [epicData.successCriteria];
+  const criteria = Array.isArray(epicData.successCriteria)
+    ? epicData.successCriteria
+    : [epicData.successCriteria];
   for (const c of criteria) {
     console.log(`    • ${c}`);
   }
@@ -99,11 +108,11 @@ function displayEpic(epicData: DisplayableEpic) {
 async function createEpicWithAI(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
-  opts: Record<string, string>
+  opts: Record<string, string>,
 ) {
   logger.heading('Create Epic (AI-powered)');
 
-  const brief = opts.title || await promptText('Describe your epic in a sentence or two:');
+  const brief = opts.title || (await promptText('Describe your epic in a sentence or two:'));
 
   // Get existing epics for deduplication
   const existingEpics = await listArtifacts(projectDir, config, 'epic');
@@ -114,7 +123,12 @@ async function createEpicWithAI(
   try {
     const provider = await getAIProvider(config);
     const messages = buildEpicPrompt(brief, existingTitles);
-    let { result: epicData } = await generateStreamingJSON(provider, messages, aiEpicResponseSchema, { maxTokens: TOKEN_BUDGETS.epic });
+    let { result: epicData } = await generateStreamingJSON(
+      provider,
+      messages,
+      aiEpicResponseSchema,
+      { maxTokens: TOKEN_BUDGETS.epic },
+    );
 
     displayEpic(epicData);
 
@@ -135,21 +149,29 @@ async function createEpicWithAI(
 
       if (action === 'regenerate') {
         logger.dim('Regenerating...');
-        ({ result: epicData } = await generateStreamingJSON(provider, messages, aiEpicResponseSchema, { maxTokens: TOKEN_BUDGETS.epic }));
+        ({ result: epicData } = await generateStreamingJSON(
+          provider,
+          messages,
+          aiEpicResponseSchema,
+          { maxTokens: TOKEN_BUDGETS.epic },
+        ));
         displayEpic(epicData);
         continue;
       }
 
       if (action === 'edit') {
         const editContent = JSON.stringify(epicData, null, 2);
-        const edited = await promptEditor('Edit the epic JSON (save & close to apply):', editContent);
+        const edited = await promptEditor(
+          'Edit the epic JSON (save & close to apply):',
+          editContent,
+        );
         try {
           const parsed = JSON.parse(edited);
           const validated = aiEpicResponseSchema.parse(parsed);
           epicData = validated;
           displayEpic(epicData);
           continue;
-        } catch (err) {
+        } catch (_err) {
           logger.error('Invalid JSON after edit. Please try again.');
           continue;
         }
@@ -168,7 +190,13 @@ async function createEpicWithAI(
       successCriteriaList: criteriaArray,
       featureIds: [],
     };
-    const { id, filePath } = await createArtifact(projectDir, config, 'epic', 'epics/epic.md.hbs', templateData);
+    const { id, filePath } = await createArtifact(
+      projectDir,
+      config,
+      'epic',
+      'epics/epic.md.hbs',
+      templateData,
+    );
 
     logger.success(`Created epic ${id}: ${epicData.title}`);
     logger.dim(`  ${filePath}`);
@@ -180,7 +208,9 @@ async function createEpicWithAI(
     logger.dim(`  4. planr task implement TASK-*           — Implement with your coding agent`);
     logger.dim('');
     logger.dim(`  Or run the full flow at once:`);
-    logger.dim(`  planr plan --epic ${id}                  — Auto-generate features → stories → tasks`);
+    logger.dim(
+      `  planr plan --epic ${id}                  — Auto-generate features → stories → tasks`,
+    );
   } catch (err) {
     const { AIError } = await import('../../ai/errors.js');
     if (err instanceof AIError) {
@@ -194,7 +224,7 @@ async function createEpicWithAI(
 async function createEpicManually(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
-  opts: Record<string, string>
+  opts: Record<string, string>,
 ) {
   logger.heading('Create Epic');
 
