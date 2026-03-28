@@ -64,8 +64,101 @@ export async function streamToTerminal(
   return chunks.join('');
 }
 
+/** Result from AI generation including the parsed data and optional token usage. */
+export interface AIGenerateResult<T> {
+  result: T;
+  usage?: AIUsage;
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/** Throw a descriptive error when the AI response was truncated. */
+function throwTruncationError(usage: AIUsage, maxTokens?: number, isRetry = false): never {
+  const prefix = isRetry ? 'AI retry response' : 'AI response';
+  const limit = maxTokens != null ? maxTokens.toLocaleString() : 'default';
+  throw new AIError(
+    `${prefix} was truncated at ${usage.outputTokens.toLocaleString()} output tokens (hit max_tokens limit of ${limit}). Try reducing the input scope or increasing the token budget.`,
+    'invalid_response'
+  );
+}
+
+/** Check usage for truncation; throw if truncated. */
+function checkTruncation(usage: AIUsage | undefined, maxTokens?: number, isRetry = false): void {
+  if (usage?.truncated) {
+    throwTruncationError(usage, maxTokens, isRetry);
+  }
+}
+
 /**
- * Generate a validated JSON response from the AI.
+ * Core generation logic shared by generateJSON and generateStreamingJSON.
+ *
+ * Accepts a `fetchResponse` callback that performs the initial AI call
+ * (sync or streaming), then handles validation, retry, truncation, and spinner.
+ */
+async function generateCore<T>(
+  provider: AIProvider,
+  messages: AIMessage[],
+  schema: ZodSchema<T>,
+  requestOptions: AIRequestOptions,
+  fetchResponse: () => Promise<string>
+): Promise<AIGenerateResult<T>> {
+  let totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
+
+  const spinner = createSpinner('Generating...');
+  try {
+    // --- First attempt ---
+    let rawResponse = await fetchResponse();
+    let lastUsage = provider.getLastUsage();
+    accumulateUsage(totalUsage, lastUsage);
+    checkTruncation(lastUsage, requestOptions.maxTokens);
+
+    const parsed = tryParseAndValidate(rawResponse, schema);
+    if (parsed.success) {
+      spinner.succeed(`Done${formatUsage(totalUsage)}`);
+      return { result: parsed.data, usage: totalUsage };
+    }
+
+    // --- Retry once with error feedback ---
+    spinner.update('Retrying...');
+    const retryMessages: AIMessage[] = [
+      ...messages,
+      { role: 'assistant', content: rawResponse },
+      {
+        role: 'user',
+        content: `Your response was not valid JSON or failed validation:\n${parsed.error}\n\nPlease fix and return valid JSON only.`,
+      },
+    ];
+
+    rawResponse = await provider.chatSync(retryMessages, requestOptions);
+    lastUsage = provider.getLastUsage();
+    accumulateUsage(totalUsage, lastUsage);
+    checkTruncation(lastUsage, requestOptions.maxTokens, true);
+
+    const retryParsed = tryParseAndValidate(rawResponse, schema);
+    if (retryParsed.success) {
+      spinner.succeed(`Done${formatUsage(totalUsage)}`);
+      return { result: retryParsed.data, usage: totalUsage };
+    }
+
+    spinner.stop();
+    throw new AIError(
+      `AI returned invalid JSON after retry: ${retryParsed.error}`,
+      'invalid_response'
+    );
+  } catch (err) {
+    spinner.stop();
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public generation functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a validated JSON response from the AI (non-streaming).
  *
  * Flow:
  * 1. Send messages with JSON mode hint
@@ -73,12 +166,6 @@ export async function streamToTerminal(
  * 3. Validate with Zod schema
  * 4. On failure, retry once with error feedback
  */
-/** Result from AI generation including the parsed data and optional token usage. */
-export interface AIGenerateResult<T> {
-  result: T;
-  usage?: AIUsage;
-}
-
 export async function generateJSON<T>(
   provider: AIProvider,
   messages: AIMessage[],
@@ -91,49 +178,13 @@ export async function generateJSON<T>(
     jsonMode: true,
   };
 
-  let totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
-
-  const spinner = createSpinner('Generating...');
-  try {
-    let rawResponse = await provider.chatSync(messages, requestOptions);
-    accumulateUsage(totalUsage, provider.getLastUsage());
-    let parsed = tryParseAndValidate(rawResponse, schema);
-
-    if (parsed.success) {
-      spinner.succeed(`Done${formatUsage(totalUsage)}`);
-      return { result: parsed.data, usage: totalUsage };
-    }
-
-    // Retry once with error feedback
-    spinner.update('Retrying...');
-    const retryMessages: AIMessage[] = [
-      ...messages,
-      { role: 'assistant', content: rawResponse },
-      {
-        role: 'user',
-        content: `Your response was not valid JSON or failed validation:\n${parsed.error}\n\nPlease fix and return valid JSON only.`,
-      },
-    ];
-
-    rawResponse = await provider.chatSync(retryMessages, requestOptions);
-    accumulateUsage(totalUsage, provider.getLastUsage());
-    spinner.succeed(`Done${formatUsage(totalUsage)}`);
-    parsed = tryParseAndValidate(rawResponse, schema);
-
-    if (parsed.success) return { result: parsed.data, usage: totalUsage };
-
-    throw new AIError(
-      `AI returned invalid JSON after retry: ${parsed.error}`,
-      'invalid_response'
-    );
-  } catch (err) {
-    spinner.stop();
-    throw err;
-  }
+  return generateCore(provider, messages, schema, requestOptions, () =>
+    provider.chatSync(messages, requestOptions)
+  );
 }
 
 /**
- * Generate JSON with streaming — shows progress dots in the terminal
+ * Generate JSON with streaming — shows progress spinner in the terminal
  * while the AI generates, then parses the complete response.
  */
 export async function generateStreamingJSON<T>(
@@ -148,54 +199,19 @@ export async function generateStreamingJSON<T>(
     jsonMode: true,
   };
 
-  let totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
-
-  // Stream the response, showing spinner for progress
-  const chunks: string[] = [];
-  const spinner = createSpinner('Generating...');
-  try {
+  return generateCore(provider, messages, schema, requestOptions, async () => {
+    const chunks: string[] = [];
     const stream = provider.chat(messages, requestOptions);
-
     for await (const chunk of stream) {
       chunks.push(chunk);
     }
-    accumulateUsage(totalUsage, provider.getLastUsage());
-
-    const rawResponse = chunks.join('');
-    let parsed = tryParseAndValidate(rawResponse, schema);
-
-    if (parsed.success) {
-      spinner.succeed(`Done${formatUsage(totalUsage)}`);
-      return { result: parsed.data, usage: totalUsage };
-    }
-
-    // Retry once with error feedback (non-streaming for retry)
-    spinner.update('Retrying...');
-    const retryMessages: AIMessage[] = [
-      ...messages,
-      { role: 'assistant', content: rawResponse },
-      {
-        role: 'user',
-        content: `Your response was not valid JSON or failed validation:\n${parsed.error}\n\nPlease fix and return valid JSON only.`,
-      },
-    ];
-
-    const retryResponse = await provider.chatSync(retryMessages, requestOptions);
-    accumulateUsage(totalUsage, provider.getLastUsage());
-    spinner.succeed(`Done${formatUsage(totalUsage)}`);
-    parsed = tryParseAndValidate(retryResponse, schema);
-
-    if (parsed.success) return { result: parsed.data, usage: totalUsage };
-
-    throw new AIError(
-      `AI returned invalid JSON after retry: ${parsed.error}`,
-      'invalid_response'
-    );
-  } catch (err) {
-    spinner.stop();
-    throw err;
-  }
+    return chunks.join('');
+  });
 }
+
+// ---------------------------------------------------------------------------
+// Internal utilities
+// ---------------------------------------------------------------------------
 
 /** Extract JSON from a response that might contain markdown code fences. */
 function extractJSON(raw: string): string {
