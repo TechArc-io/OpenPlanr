@@ -18,13 +18,15 @@ export class ClaudeAgent implements CodingAgent {
 
   async execute(prompt: string, options: AgentOptions): Promise<AgentResult> {
     return new Promise((resolve, reject) => {
-      const args = ['--print', '-p', prompt];
-
-      const child = spawn('claude', args, {
+      const child = spawn('claude', ['--print'], {
         cwd: options.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
       });
+
+      // Pass the prompt via stdin to avoid OS argument length limits
+      child.stdin.write(prompt);
+      child.stdin.end();
 
       const chunks: string[] = [];
 

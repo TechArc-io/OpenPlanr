@@ -18,11 +18,15 @@ export class CodexAgent implements CodingAgent {
 
   async execute(prompt: string, options: AgentOptions): Promise<AgentResult> {
     return new Promise((resolve, reject) => {
-      const child = spawn('codex', [prompt], {
+      const child = spawn('codex', ['--quiet'], {
         cwd: options.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
       });
+
+      // Pass the prompt via stdin to avoid OS argument length limits
+      child.stdin.write(prompt);
+      child.stdin.end();
 
       const chunks: string[] = [];
 
