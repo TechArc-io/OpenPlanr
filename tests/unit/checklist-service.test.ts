@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   parseChecklistItems,
   toggleChecklistItems,
   getChecklistProgress,
+  getChecklistPath,
+  createChecklist,
+  readChecklist,
+  resetChecklist,
 } from '../../src/services/checklist-service.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { ensureDir } from '../../src/utils/fs.js';
+import { createDefaultConfig } from '../../src/services/config-service.js';
 
 const SAMPLE_CHECKLIST = `# Agile Development Guide — TestProject
 
@@ -23,6 +32,55 @@ const SAMPLE_CHECKLIST = `# Agile Development Guide — TestProject
 |---|----------|----------|--------|
 | 4 | UML Sequence Diagrams | \`docs/agile/diagrams/\` | [ ] |
 | 5 | C4 Architecture Diagrams | \`docs/agile/diagrams/\` | [ ] |`;
+
+describe('getChecklistPath', () => {
+  it('returns path ending in checklists/AGILE-DEVELOPMENT-GUIDE.md', () => {
+    const config = createDefaultConfig('test');
+    const p = getChecklistPath('/project', config);
+    expect(p).toBe('/project/docs/agile/checklists/AGILE-DEVELOPMENT-GUIDE.md');
+  });
+});
+
+describe('createChecklist / readChecklist / resetChecklist', () => {
+  let tmpDir: string;
+  let config: ReturnType<typeof createDefaultConfig>;
+
+  beforeAll(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'planr-checklist-'));
+    config = createDefaultConfig('test');
+    await ensureDir(join(tmpDir, config.outputPaths.agile, 'checklists'));
+  });
+
+  afterAll(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('creates a checklist file', async () => {
+    const filePath = await createChecklist(tmpDir, config);
+    expect(filePath).toContain('AGILE-DEVELOPMENT-GUIDE.md');
+  });
+
+  it('reads the created checklist', async () => {
+    const content = await readChecklist(tmpDir, config);
+    expect(content).not.toBeNull();
+    expect(content).toContain('Agile');
+  });
+
+  it('returns null when checklist does not exist', async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'planr-empty-'));
+    await ensureDir(join(emptyDir, config.outputPaths.agile, 'checklists'));
+    const content = await readChecklist(emptyDir, config);
+    expect(content).toBeNull();
+    rmSync(emptyDir, { recursive: true, force: true });
+  });
+
+  it('resetChecklist recreates the checklist', async () => {
+    const filePath = await resetChecklist(tmpDir, config);
+    expect(filePath).toContain('AGILE-DEVELOPMENT-GUIDE.md');
+    const content = await readChecklist(tmpDir, config);
+    expect(content).not.toBeNull();
+  });
+});
 
 describe('parseChecklistItems', () => {
   it('should parse all checklist items from markdown', () => {
