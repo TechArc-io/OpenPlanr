@@ -4,11 +4,11 @@
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { writeFile, ensureDir } from '../../src/utils/fs.js';
-import { createDefaultConfig } from '../../src/services/config-service.js';
+import { join } from 'node:path';
 import type { OpenPlanrConfig } from '../../src/models/types.js';
+import { createDefaultConfig } from '../../src/services/config-service.js';
+import { ensureDir, writeFile } from '../../src/utils/fs.js';
 
 export interface TestProject {
   dir: string;
@@ -19,17 +19,12 @@ export interface TestProject {
 /**
  * Create a temporary project with planr.config.json and artifact directories.
  */
-export async function createTestProject(
-  projectName = 'test-project'
-): Promise<TestProject> {
+export async function createTestProject(projectName = 'test-project'): Promise<TestProject> {
   const dir = mkdtempSync(join(tmpdir(), 'planr-integration-'));
   const config = createDefaultConfig(projectName);
 
   // Write config
-  await writeFile(
-    join(dir, 'planr.config.json'),
-    JSON.stringify(config, null, 2) + '\n'
-  );
+  await writeFile(join(dir, 'planr.config.json'), `${JSON.stringify(config, null, 2)}\n`);
 
   // Create artifact directories
   const agileDir = join(dir, config.outputPaths.agile);
@@ -53,7 +48,7 @@ export async function writeSampleEpic(
   config: OpenPlanrConfig,
   id: string,
   title: string,
-  featureLinks: string[] = []
+  featureLinks: string[] = [],
 ): Promise<void> {
   const slug = title.toLowerCase().replace(/\s+/g, '-');
   const filename = `${id}-${slug}.md`;
@@ -118,7 +113,7 @@ export async function writeSampleFeature(
   id: string,
   title: string,
   epicId: string,
-  storyLinks: string[] = []
+  storyLinks: string[] = [],
 ): Promise<void> {
   const slug = title.toLowerCase().replace(/\s+/g, '-');
   const filename = `${id}-${slug}.md`;
@@ -178,7 +173,7 @@ export async function writeSampleStory(
   id: string,
   title: string,
   featureId: string,
-  taskLinks: string[] = []
+  taskLinks: string[] = [],
 ): Promise<void> {
   const slug = title.toLowerCase().replace(/\s+/g, '-');
   const filename = `${id}-${slug}.md`;

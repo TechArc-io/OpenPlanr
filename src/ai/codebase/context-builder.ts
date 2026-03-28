@@ -6,9 +6,9 @@
  * budget (~8K tokens ≈ 32K chars) to avoid prompt overflow.
  */
 
+import { findRelatedFiles, readFileSnippets } from './file-reader.js';
 import { detectTechStack, formatTechStack, type TechStack } from './stack-detector.js';
 import { generateFolderTree } from './tree-generator.js';
-import { findRelatedFiles, readFileSnippets } from './file-reader.js';
 
 const MAX_CONTEXT_CHARS = 32_000; // ~8K tokens
 
@@ -26,7 +26,7 @@ export interface CodebaseContext {
  */
 export async function buildCodebaseContext(
   projectDir: string,
-  keywords: string[] = []
+  keywords: string[] = [],
 ): Promise<CodebaseContext> {
   const [techStack, folderTree, relatedPaths] = await Promise.all([
     detectTechStack(projectDir),
@@ -57,7 +57,7 @@ export function formatCodebaseContext(ctx: CodebaseContext): string {
     const maxLines = 60;
     const truncatedTree =
       treeLines.length > maxLines
-        ? treeLines.slice(0, maxLines).join('\n') + '\n... (truncated)'
+        ? `${treeLines.slice(0, maxLines).join('\n')}\n... (truncated)`
         : ctx.folderTree;
     sections.push(`## Project Structure\n\`\`\`\n${truncatedTree}\n\`\`\``);
   }
@@ -79,7 +79,7 @@ export function formatCodebaseContext(ctx: CodebaseContext): string {
   }
   if (result.length > MAX_CONTEXT_CHARS) {
     // Even tree is too large, truncate aggressively
-    result = result.slice(0, MAX_CONTEXT_CHARS) + '\n... (context truncated)';
+    result = `${result.slice(0, MAX_CONTEXT_CHARS)}\n... (context truncated)`;
   }
 
   return result;

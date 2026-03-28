@@ -17,7 +17,7 @@ export class OllamaProvider extends OpenAIProvider {
     super(
       'ollama', // Ollama doesn't require an API key
       model || 'llama3.1',
-      baseUrl || DEFAULT_OLLAMA_URL
+      baseUrl || DEFAULT_OLLAMA_URL,
     );
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // We need to mock fs before importing template-service since it registers
 // Handlebars helpers at module load time
@@ -13,7 +13,8 @@ vi.mock('../../src/utils/constants.js', () => ({
 }));
 
 import { renderTemplate } from '../../src/services/template-service.js';
-import { readFile, fileExists } from '../../src/utils/fs.js';
+import { fileExists, readFile } from '../../src/utils/fs.js';
+
 const mockReadFile = vi.mocked(readFile);
 const mockFileExists = vi.mocked(fileExists);
 

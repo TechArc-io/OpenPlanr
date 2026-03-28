@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
 import path from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
+  ARTIFACT_DIRS,
   CONFIG_FILENAME,
   DEFAULT_AGILE_DIR,
   DEFAULT_CURSOR_RULES_DIR,
-  ARTIFACT_DIRS,
-  ID_PREFIXES,
   getTemplatesDir,
+  ID_PREFIXES,
 } from '../../src/utils/constants.js';
 
 describe('constants', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseId } from '../../src/services/id-service.js';
 
 describe('parseId', () => {

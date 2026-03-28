@@ -36,11 +36,11 @@ export function createSpinner(message: string): Spinner {
     },
     stop() {
       clearInterval(interval);
-      process.stdout.write('\r' + ' '.repeat(currentMsg.length + 4) + '\r');
+      process.stdout.write(`\r${' '.repeat(currentMsg.length + 4)}\r`);
     },
     succeed(msg: string) {
       clearInterval(interval);
-      process.stdout.write('\r' + ' '.repeat(currentMsg.length + 4) + '\r');
+      process.stdout.write(`\r${' '.repeat(currentMsg.length + 4)}\r`);
       console.log(chalk.green('✓'), msg);
     },
   };

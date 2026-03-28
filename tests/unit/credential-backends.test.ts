@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { EncryptedFileBackend } from '../../src/services/credential-backends.js';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { EncryptedFileBackend } from '../../src/services/credential-backends.js';
 
 /**
  * Test the EncryptedFileBackend in isolation using a temp directory.

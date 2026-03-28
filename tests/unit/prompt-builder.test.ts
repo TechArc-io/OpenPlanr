@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   buildEpicPrompt,
   buildFeaturesPrompt,
+  buildRefinePrompt,
   buildStoriesPrompt,
   buildTasksPrompt,
-  buildRefinePrompt,
 } from '../../src/ai/prompts/prompt-builder.js';
 
 describe('buildEpicPrompt', () => {

@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { createGenerator, createGenerators } from '../../src/generators/generator-factory.js';
-import { CursorGenerator } from '../../src/generators/cursor-generator.js';
+import { describe, expect, it } from 'vitest';
 import { ClaudeGenerator } from '../../src/generators/claude-generator.js';
 import { CodexGenerator } from '../../src/generators/codex-generator.js';
+import { CursorGenerator } from '../../src/generators/cursor-generator.js';
+import { createGenerator, createGenerators } from '../../src/generators/generator-factory.js';
 import type { OpenPlanrConfig } from '../../src/models/types.js';
 
 const mockConfig: OpenPlanrConfig = {

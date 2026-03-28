@@ -1,18 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-  parseChecklistItems,
-  toggleChecklistItems,
-  getChecklistProgress,
-  getChecklistPath,
   createChecklist,
+  getChecklistPath,
+  getChecklistProgress,
+  parseChecklistItems,
   readChecklist,
   resetChecklist,
+  toggleChecklistItems,
 } from '../../src/services/checklist-service.js';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { ensureDir } from '../../src/utils/fs.js';
 import { createDefaultConfig } from '../../src/services/config-service.js';
+import { ensureDir } from '../../src/utils/fs.js';
 
 const SAMPLE_CHECKLIST = `# Agile Development Guide — TestProject
 
@@ -96,7 +96,11 @@ describe('parseChecklistItems', () => {
 
   it('should parse unchecked items correctly', () => {
     const items = parseChecklistItems(SAMPLE_CHECKLIST);
-    expect(items[2]).toMatchObject({ index: 3, activity: 'Create User Stories from Features', done: false });
+    expect(items[2]).toMatchObject({
+      index: 3,
+      activity: 'Create User Stories from Features',
+      done: false,
+    });
     expect(items[3]).toMatchObject({ index: 4, activity: 'UML Sequence Diagrams', done: false });
   });
 
@@ -133,9 +137,9 @@ describe('toggleChecklistItems', () => {
     const updated = toggleChecklistItems(SAMPLE_CHECKLIST, new Set([1, 3, 4]), items);
     const updatedItems = parseChecklistItems(updated);
     expect(updatedItems[0].done).toBe(false); // was checked → unchecked
-    expect(updatedItems[1].done).toBe(true);  // unchanged
-    expect(updatedItems[2].done).toBe(true);  // was unchecked → checked
-    expect(updatedItems[3].done).toBe(true);  // was unchecked → checked
+    expect(updatedItems[1].done).toBe(true); // unchanged
+    expect(updatedItems[2].done).toBe(true); // was unchecked → checked
+    expect(updatedItems[3].done).toBe(true); // was unchecked → checked
     expect(updatedItems[4].done).toBe(false); // unchanged
   });
 

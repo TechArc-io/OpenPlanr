@@ -1,10 +1,10 @@
-import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
-import { createGenerators, createGenerator } from '../../generators/generator-factory.js';
-import { writeFile, ensureDir } from '../../utils/fs.js';
-import { logger } from '../../utils/logger.js';
 import path from 'node:path';
-import type { TargetCLI, ArtifactCollection } from '../../models/types.js';
+import type { Command } from 'commander';
+import { createGenerator, createGenerators } from '../../generators/generator-factory.js';
+import type { ArtifactCollection, TargetCLI } from '../../models/types.js';
+import { loadConfig } from '../../services/config-service.js';
+import { ensureDir, writeFile } from '../../utils/fs.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerRulesCommand(program: Command) {
   program
@@ -51,8 +51,6 @@ export function registerRulesCommand(program: Command) {
         }
       }
 
-      logger.success(
-        `${opts.dryRun ? 'Would generate' : 'Generated'} ${totalFiles} rule file(s)`
-      );
+      logger.success(`${opts.dryRun ? 'Would generate' : 'Generated'} ${totalFiles} rule file(s)`);
     });
 }

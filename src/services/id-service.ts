@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { listFiles } from '../utils/fs.js';
 
 export async function getNextId(dir: string, prefix: string): Promise<string> {

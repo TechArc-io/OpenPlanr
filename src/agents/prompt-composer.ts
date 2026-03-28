@@ -58,7 +58,7 @@ export function composeImplementationPrompt(ctx: ImplementationContext): string 
   // Full task list (shows what's done and what's pending)
   sections.push('\n## Full Task List\n');
   sections.push('```');
-  const targetIds = new Set(ctx.targetSubtasks.map((t) => t.id));
+  const _targetIds = new Set(ctx.targetSubtasks.map((t) => t.id));
   const firstTargetId = ctx.targetSubtasks[0]?.id;
   sections.push(formatSubtaskList(ctx.allSubtasks, firstTargetId));
   sections.push('```');
@@ -101,5 +101,5 @@ export function composeImplementationPrompt(ctx: ImplementationContext): string 
 
 function truncate(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
-  return text.slice(0, maxChars) + '\n\n... (truncated)';
+  return `${text.slice(0, maxChars)}\n\n... (truncated)`;
 }

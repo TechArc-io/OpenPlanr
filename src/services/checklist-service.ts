@@ -1,7 +1,7 @@
 import path from 'node:path';
+import type { OpenPlanrConfig } from '../models/types.js';
 import { fileExists, readFile, writeFile } from '../utils/fs.js';
 import { renderTemplate } from './template-service.js';
-import type { OpenPlanrConfig } from '../models/types.js';
 
 const CHECKLIST_FILENAME = 'AGILE-DEVELOPMENT-GUIDE.md';
 
@@ -18,7 +18,7 @@ export function getChecklistPath(projectDir: string, config: OpenPlanrConfig): s
 
 export async function createChecklist(
   projectDir: string,
-  config: OpenPlanrConfig
+  config: OpenPlanrConfig,
 ): Promise<string> {
   const filePath = getChecklistPath(projectDir, config);
   const content = await renderTemplate(
@@ -27,7 +27,7 @@ export async function createChecklist(
       projectName: config.projectName,
       date: new Date().toISOString().split('T')[0],
     },
-    config.templateOverrides
+    config.templateOverrides,
   );
   await writeFile(filePath, content);
   return filePath;
@@ -35,17 +35,14 @@ export async function createChecklist(
 
 export async function readChecklist(
   projectDir: string,
-  config: OpenPlanrConfig
+  config: OpenPlanrConfig,
 ): Promise<string | null> {
   const filePath = getChecklistPath(projectDir, config);
   if (!(await fileExists(filePath))) return null;
   return readFile(filePath);
 }
 
-export async function resetChecklist(
-  projectDir: string,
-  config: OpenPlanrConfig
-): Promise<string> {
+export async function resetChecklist(projectDir: string, config: OpenPlanrConfig): Promise<string> {
   return createChecklist(projectDir, config);
 }
 
@@ -80,17 +77,14 @@ export function parseChecklistItems(content: string): ChecklistItem[] {
 export function toggleChecklistItems(
   content: string,
   toggleIndices: Set<number>,
-  items: ChecklistItem[]
+  items: ChecklistItem[],
 ): string {
   const lines = content.split('\n');
 
   for (const item of items) {
     if (toggleIndices.has(item.index)) {
       const newStatus = item.done ? '[ ]' : '[x]';
-      lines[item.lineIndex] = lines[item.lineIndex].replace(
-        /\[(x| )\]\s*\|$/,
-        `${newStatus} |`
-      );
+      lines[item.lineIndex] = lines[item.lineIndex].replace(/\[(x| )\]\s*\|$/, `${newStatus} |`);
     }
   }
 

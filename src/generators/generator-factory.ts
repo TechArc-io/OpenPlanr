@@ -1,13 +1,13 @@
-import { BaseGenerator } from './base-generator.js';
-import { CursorGenerator } from './cursor-generator.js';
+import type { OpenPlanrConfig, TargetCLI } from '../models/types.js';
+import type { BaseGenerator } from './base-generator.js';
 import { ClaudeGenerator } from './claude-generator.js';
 import { CodexGenerator } from './codex-generator.js';
-import type { OpenPlanrConfig, TargetCLI } from '../models/types.js';
+import { CursorGenerator } from './cursor-generator.js';
 
 export function createGenerator(
   target: TargetCLI,
   config: OpenPlanrConfig,
-  projectDir: string
+  projectDir: string,
 ): BaseGenerator {
   switch (target) {
     case 'cursor':
@@ -21,9 +21,6 @@ export function createGenerator(
   }
 }
 
-export function createGenerators(
-  config: OpenPlanrConfig,
-  projectDir: string
-): BaseGenerator[] {
+export function createGenerators(config: OpenPlanrConfig, projectDir: string): BaseGenerator[] {
   return config.targets.map((target) => createGenerator(target, config, projectDir));
 }

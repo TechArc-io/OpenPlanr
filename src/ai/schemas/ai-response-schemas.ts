@@ -19,7 +19,15 @@ export const aiEpicResponseSchema = z.object({
   successCriteria: z.union([
     z.array(z.string().min(1)).min(1),
     // Gracefully handle string format: split by semicolons
-    z.string().min(1).transform((s) => s.split(';').map((item) => item.trim()).filter(Boolean)),
+    z
+      .string()
+      .min(1)
+      .transform((s) =>
+        s
+          .split(';')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
   ]),
   keyFeatures: z.array(z.string().min(1)).min(1),
   dependencies: z.string().default('None'),

@@ -68,7 +68,7 @@ export function findSubtasks(tasks: ParsedSubtask[], query: string): ParsedSubta
     const isGroup = query.endsWith('.0');
     if (isGroup) {
       const groupNum = query.split('.')[0];
-      return tasks.filter((t) => t.id.startsWith(groupNum + '.'));
+      return tasks.filter((t) => t.id.startsWith(`${groupNum}.`));
     }
     return exactMatch;
   }

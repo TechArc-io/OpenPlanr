@@ -2,8 +2,8 @@
  * Factory for creating coding agent instances.
  */
 
-import type { CodingAgent } from './types.js';
 import type { CodingAgentName } from '../models/types.js';
+import type { CodingAgent } from './types.js';
 
 export async function createAgent(name: CodingAgentName): Promise<CodingAgent> {
   switch (name) {

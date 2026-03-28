@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { AIError, wrapProviderError } from '../../src/ai/errors.js';
 
 describe('AIError', () => {
@@ -98,7 +98,7 @@ describe('wrapProviderError', () => {
   it('wraps 429 as rate_limit with retry-after', () => {
     const err = wrapProviderError(
       { status: 429, message: 'Too Many Requests', headers: { 'retry-after': '10' } },
-      'anthropic'
+      'anthropic',
     );
     expect(err.code).toBe('rate_limit');
     expect(err.retryable).toBe(true);

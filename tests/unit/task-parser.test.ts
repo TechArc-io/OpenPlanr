@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
-  parseTaskMarkdown,
   findSubtasks,
-  getNextPending,
   formatSubtaskList,
+  getNextPending,
+  parseTaskMarkdown,
 } from '../../src/agents/task-parser.js';
 
 const fixturePath = resolve('tests/fixtures/sample-task-list.md');

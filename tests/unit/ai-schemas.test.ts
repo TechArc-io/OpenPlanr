@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   aiEpicResponseSchema,
   aiFeaturesResponseSchema,
+  aiRefineResponseSchema,
   aiStoriesResponseSchema,
   aiTasksResponseSchema,
-  aiRefineResponseSchema,
 } from '../../src/ai/schemas/ai-response-schemas.js';
 
 describe('aiEpicResponseSchema', () => {

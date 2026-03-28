@@ -8,10 +8,10 @@
  * - Non-truncated failures still retry normally
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { generateJSON, generateStreamingJSON } from '../../src/services/ai-service.js';
 import type { AIProvider, AIUsage } from '../../src/ai/types.js';
+import { generateJSON, generateStreamingJSON } from '../../src/services/ai-service.js';
 
 // Mock logger to prevent spinner output in tests
 vi.mock('../../src/utils/logger.js', () => ({
@@ -27,8 +27,6 @@ const testSchema = z.object({
   title: z.string(),
   items: z.array(z.string()),
 });
-
-type TestSchema = z.infer<typeof testSchema>;
 
 function createMockProvider(overrides: {
   chatSyncResponses?: string[];
@@ -66,9 +64,9 @@ describe('generateJSON truncation detection', () => {
       usages: [{ inputTokens: 5000, outputTokens: 4096, truncated: true }],
     });
 
-    await expect(
-      generateJSON(provider, [], testSchema, { maxTokens: 4096 })
-    ).rejects.toThrow(/truncated at 4,096 output tokens/);
+    await expect(generateJSON(provider, [], testSchema, { maxTokens: 4096 })).rejects.toThrow(
+      /truncated at 4,096 output tokens/,
+    );
 
     // chatSync should only be called once — no retry
     expect(provider.chatSync).toHaveBeenCalledTimes(1);
@@ -80,9 +78,9 @@ describe('generateJSON truncation detection', () => {
       usages: [{ inputTokens: 3000, outputTokens: 8192, truncated: true }],
     });
 
-    await expect(
-      generateJSON(provider, [], testSchema, { maxTokens: 8192 })
-    ).rejects.toThrow(/max_tokens limit of 8,192/);
+    await expect(generateJSON(provider, [], testSchema, { maxTokens: 8192 })).rejects.toThrow(
+      /max_tokens limit of 8,192/,
+    );
   });
 
   it('catches truncation on retry attempt', async () => {
@@ -103,9 +101,9 @@ describe('generateJSON truncation detection', () => {
     ];
     provider.getLastUsage = vi.fn(() => usages[usageIndex++]);
 
-    await expect(
-      generateJSON(provider, [], testSchema, { maxTokens: 4096 })
-    ).rejects.toThrow(/retry response was truncated at 4,096/);
+    await expect(generateJSON(provider, [], testSchema, { maxTokens: 4096 })).rejects.toThrow(
+      /retry response was truncated at 4,096/,
+    );
 
     // Both attempts should be called (first + retry)
     expect(provider.chatSync).toHaveBeenCalledTimes(2);
@@ -149,7 +147,7 @@ describe('generateStreamingJSON truncation detection', () => {
     };
 
     await expect(
-      generateStreamingJSON(provider, [], testSchema, { maxTokens: 16384 })
+      generateStreamingJSON(provider, [], testSchema, { maxTokens: 16384 }),
     ).rejects.toThrow(/truncated at 16,384 output tokens/);
 
     // chatSync (retry) should NOT be called
@@ -191,7 +189,8 @@ describe('truncation error message quality', () => {
     const provider: AIProvider = {
       name: 'anthropic',
       model: 'test',
-      chatSync: vi.fn()
+      chatSync: vi
+        .fn()
         .mockResolvedValueOnce('{"bad": "schema"}')
         .mockResolvedValueOnce('{"truncated...'),
       chat: vi.fn(),

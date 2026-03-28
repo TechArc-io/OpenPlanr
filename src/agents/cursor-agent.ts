@@ -5,10 +5,10 @@
  * prompt to a file that Cursor can read from its prompt panel.
  */
 
-import path from 'node:path';
 import { access } from 'node:fs/promises';
-import { writeFile, ensureDir } from '../utils/fs.js';
-import type { CodingAgent, AgentOptions, AgentResult } from './types.js';
+import path from 'node:path';
+import { ensureDir, writeFile } from '../utils/fs.js';
+import type { AgentOptions, AgentResult, CodingAgent } from './types.js';
 
 export class CursorAgent implements CodingAgent {
   readonly name = 'cursor';
@@ -16,7 +16,9 @@ export class CursorAgent implements CodingAgent {
   async isAvailable(): Promise<boolean> {
     // Cursor is available if the project has a .cursor directory
     // or the cursor binary exists
-    return access(path.join(process.cwd(), '.cursor')).then(() => true).catch(() => false);
+    return access(path.join(process.cwd(), '.cursor'))
+      .then(() => true)
+      .catch(() => false);
   }
 
   async execute(prompt: string, options: AgentOptions): Promise<AgentResult> {
@@ -37,7 +39,7 @@ export class CursorAgent implements CodingAgent {
       '  1. Open Cursor in this project',
       '  2. Open the Command Palette (Cmd+Shift+P)',
       '  3. Run "Cursor: Open Prompt" and select the saved file',
-      '  4. Or paste the prompt directly into Cursor\'s AI chat',
+      "  4. Or paste the prompt directly into Cursor's AI chat",
     ].join('\n');
 
     if (options.stream) {

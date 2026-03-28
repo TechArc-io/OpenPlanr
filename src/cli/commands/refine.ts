@@ -6,26 +6,30 @@
  * With --cascade, automatically refines all children down the hierarchy.
  */
 
-import { Command } from 'commander';
-import type { OpenPlanrConfig, ArtifactType } from '../../models/types.js';
-import type { AIProvider } from '../../ai/types.js';
-import { loadConfig } from '../../services/config-service.js';
-import {
-  readArtifactRaw,
-  readArtifact,
-  updateArtifact,
-  findArtifactTypeById,
-  listArtifacts,
-} from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateJSON, accumulateUsage } from '../../services/ai-service.js';
-import type { AIUsage } from '../../ai/types.js';
-import { TOKEN_BUDGETS } from '../../ai/types.js';
+import chalk from 'chalk';
+import type { Command } from 'commander';
 import { buildRefinePrompt } from '../../ai/prompts/prompt-builder.js';
 import { aiRefineResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
-import { toMarkdownWithFrontmatter } from '../../utils/markdown.js';
+import type { AIProvider, AIUsage } from '../../ai/types.js';
+import { TOKEN_BUDGETS } from '../../ai/types.js';
+import type { ArtifactType, OpenPlanrConfig } from '../../models/types.js';
+import {
+  accumulateUsage,
+  generateJSON,
+  getAIProvider,
+  isAIConfigured,
+} from '../../services/ai-service.js';
+import {
+  findArtifactTypeById,
+  listArtifacts,
+  readArtifact,
+  readArtifactRaw,
+  updateArtifact,
+} from '../../services/artifact-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptSelect } from '../../services/prompt-service.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
+import { toMarkdownWithFrontmatter } from '../../utils/markdown.js';
 
 const CHILD_MAP: Record<string, { childType: ArtifactType; label: string; parentField: string }> = {
   epic: { childType: 'feature', label: 'features', parentField: 'epicId' },
@@ -60,9 +64,19 @@ export function registerRefineCommand(program: Command) {
 
         if (opts.cascade) {
           const totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
-          const count = await refineCascade(projectDir, config, provider, type, artifactId, undefined, totalUsage);
+          const count = await refineCascade(
+            projectDir,
+            config,
+            provider,
+            type,
+            artifactId,
+            undefined,
+            totalUsage,
+          );
           if (totalUsage.inputTokens > 0) {
-            logger.dim(`\nCascade complete: ${count} artifact(s) refined (${totalUsage.inputTokens.toLocaleString()} in → ${totalUsage.outputTokens.toLocaleString()} out tokens total)`);
+            logger.dim(
+              `\nCascade complete: ${count} artifact(s) refined (${totalUsage.inputTokens.toLocaleString()} in → ${totalUsage.outputTokens.toLocaleString()} out tokens total)`,
+            );
           }
         } else {
           await refineOne(projectDir, config, provider, type, artifactId);
@@ -88,7 +102,7 @@ async function refineOne(
   provider: AIProvider,
   type: ArtifactType,
   artifactId: string,
-  parentContext?: { type: string; content: string }
+  parentContext?: { type: string; content: string },
 ): Promise<void> {
   const rawContent = await readArtifactRaw(projectDir, config, type, artifactId);
   if (!rawContent) {
@@ -99,7 +113,9 @@ async function refineOne(
   logger.heading(`Refine ${artifactId}`);
 
   const messages = buildRefinePrompt(rawContent, type, parentContext);
-  const { result } = await generateJSON(provider, messages, aiRefineResponseSchema, { maxTokens: TOKEN_BUDGETS.refine });
+  const { result } = await generateJSON(provider, messages, aiRefineResponseSchema, {
+    maxTokens: TOKEN_BUDGETS.refine,
+  });
 
   // Resolve improvedMarkdown — if AI returned JSON instead of markdown, reconstruct it
   let markdown = result.improvedMarkdown;
@@ -109,7 +125,7 @@ async function refineOne(
     const improved = result.improved as Record<string, unknown>;
     markdown = toMarkdownWithFrontmatter(
       improved,
-      rawContent.split('---').slice(2).join('---').trim()
+      rawContent.split('---').slice(2).join('---').trim(),
     );
   }
 
@@ -163,7 +179,7 @@ async function refineCascade(
   type: ArtifactType,
   artifactId: string,
   parentContext?: { type: string; content: string },
-  totalUsage?: AIUsage
+  totalUsage?: AIUsage,
 ): Promise<number> {
   let count = 0;
 
@@ -178,15 +194,21 @@ async function refineCascade(
 
   // Read the updated parent content to pass as context to children
   const updatedContent = await readArtifactRaw(projectDir, config, type, artifactId);
-  const childParentContext = updatedContent
-    ? { type, content: updatedContent }
-    : undefined;
+  const childParentContext = updatedContent ? { type, content: updatedContent } : undefined;
 
   const mapping = CHILD_MAP[type];
   logger.heading(`Cascading to ${children.length} ${mapping.label}...`);
 
   for (const childId of children) {
-    count += await refineCascade(projectDir, config, provider, mapping.childType, childId, childParentContext, totalUsage);
+    count += await refineCascade(
+      projectDir,
+      config,
+      provider,
+      mapping.childType,
+      childId,
+      childParentContext,
+      totalUsage,
+    );
   }
 
   return count;
@@ -199,7 +221,7 @@ async function findChildren(
   projectDir: string,
   config: OpenPlanrConfig,
   parentType: ArtifactType,
-  parentId: string
+  parentId: string,
 ): Promise<string[]> {
   const mapping = CHILD_MAP[parentType];
   if (!mapping) return [];
@@ -224,7 +246,7 @@ async function suggestNextSteps(
   projectDir: string,
   config: OpenPlanrConfig,
   type: ArtifactType,
-  artifactId: string
+  artifactId: string,
 ): Promise<void> {
   const children = await findChildren(projectDir, config, type, artifactId);
   if (children.length === 0) return;
@@ -234,7 +256,9 @@ async function suggestNextSteps(
   console.log('');
   console.log(chalk.dim('━'.repeat(50)));
   console.log(chalk.bold('  Next steps'));
-  console.log(chalk.dim(`  This ${type} has ${children.length} ${mapping.label} that may need re-alignment:`));
+  console.log(
+    chalk.dim(`  This ${type} has ${children.length} ${mapping.label} that may need re-alignment:`),
+  );
   console.log('');
   console.log(chalk.cyan(`    planr refine ${artifactId} --cascade`));
   console.log(chalk.dim('    Refines this artifact and all children down the hierarchy.'));
