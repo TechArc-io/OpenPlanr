@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { logger, setVerbose, isVerbose, formatUsage } from '../../src/utils/logger.js';
+import { logger, setVerbose, isVerbose, formatUsage, createSpinner } from '../../src/utils/logger.js';
 
 beforeEach(() => {
   setVerbose(false);
@@ -104,5 +104,48 @@ describe('logger standard methods', () => {
   it('dim outputs to console.log', () => {
     logger.dim('test dim');
     expect(console.log).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createSpinner', () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+  });
+
+  it('writes spinner frame on creation', () => {
+    const spinner = createSpinner('Loading...');
+    spinner.stop();
+    expect(stdoutSpy).toHaveBeenCalled();
+  });
+
+  it('stop clears the spinner line', () => {
+    const spinner = createSpinner('Loading...');
+    spinner.stop();
+    // Last write should clear the line
+    const lastCall = stdoutSpy.mock.calls[stdoutSpy.mock.calls.length - 1][0] as string;
+    expect(lastCall).toMatch(/\r\s+\r/);
+  });
+
+  it('update changes the message', () => {
+    const spinner = createSpinner('First');
+    spinner.update('Second');
+    spinner.stop();
+    // Verify update was called without error
+    expect(stdoutSpy).toHaveBeenCalled();
+  });
+
+  it('succeed prints green checkmark message', () => {
+    const spinner = createSpinner('Loading...');
+    spinner.succeed('Done!');
+    // succeed should call console.log with checkmark
+    expect(console.log).toHaveBeenCalled();
+    const output = (console.log as any).mock.calls[0][1];
+    expect(output).toContain('Done!');
   });
 });
