@@ -67,7 +67,13 @@ describe('sync: missing link detection', () => {
     // Epic has no feature links (placeholder text)
     await writeSampleEpic(project.dir, project.config, 'EPIC-001', 'Test Epic');
     // Feature references EPIC-001 via epicId
-    await writeSampleFeature(project.dir, project.config, 'FEAT-001', 'Missing Link Feature', 'EPIC-001');
+    await writeSampleFeature(
+      project.dir,
+      project.config,
+      'FEAT-001',
+      'Missing Link Feature',
+      'EPIC-001',
+    );
 
     const epicRaw = await readArtifactRaw(project.dir, project.config, 'epic', 'EPIC-001');
     expect(epicRaw).not.toContain('FEAT-001');
@@ -100,7 +106,13 @@ describe('sync: addChildReference repairs', () => {
 
     // Add the reference
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-001', 'New Feature'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-001',
+      'New Feature',
     );
 
     // After: link present
@@ -119,7 +131,13 @@ describe('sync: addChildReference repairs', () => {
 
     // Add reference
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-001', 'First Feature'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-001',
+      'First Feature',
     );
 
     // After: placeholder replaced with link
@@ -132,11 +150,23 @@ describe('sync: addChildReference repairs', () => {
     await writeSampleEpic(project.dir, project.config, 'EPIC-001', 'Test Epic', [
       '- [FEAT-001: Existing Feature](../features/FEAT-001-existing-feature.md)',
     ]);
-    await writeSampleFeature(project.dir, project.config, 'FEAT-001', 'Existing Feature', 'EPIC-001');
+    await writeSampleFeature(
+      project.dir,
+      project.config,
+      'FEAT-001',
+      'Existing Feature',
+      'EPIC-001',
+    );
     await writeSampleFeature(project.dir, project.config, 'FEAT-002', 'New Feature', 'EPIC-001');
 
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-002', 'New Feature'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-002',
+      'New Feature',
     );
 
     const epicRaw = await readArtifactRaw(project.dir, project.config, 'epic', 'EPIC-001');
@@ -158,7 +188,7 @@ describe('sync: update artifact content', () => {
     // Replace stale link section
     const fixed = raw!.replace(
       '- [US-999: Ghost](../stories/US-999-ghost.md)',
-      '_No user stories created yet. Run `planr story create --feature FEAT-001` to create user stories._'
+      '_No user stories created yet. Run `planr story create --feature FEAT-001` to create user stories._',
     );
     await updateArtifact(project.dir, project.config, 'feature', 'FEAT-001', fixed);
 

@@ -31,28 +31,19 @@ describe('getNextId', () => {
   });
 
   it('fills gaps in numbering', async () => {
-    mockListFiles.mockResolvedValue([
-      'TASK-002-some-task.md',
-      'TASK-003-another.md',
-    ]);
+    mockListFiles.mockResolvedValue(['TASK-002-some-task.md', 'TASK-003-another.md']);
     const id = await getNextId('/fake/dir', 'TASK');
     expect(id).toBe('TASK-001');
   });
 
   it('fills middle gaps', async () => {
-    mockListFiles.mockResolvedValue([
-      'FEAT-001-first.md',
-      'FEAT-003-third.md',
-    ]);
+    mockListFiles.mockResolvedValue(['FEAT-001-first.md', 'FEAT-003-third.md']);
     const id = await getNextId('/fake/dir', 'FEAT');
     expect(id).toBe('FEAT-002');
   });
 
   it('handles different prefixes independently', async () => {
-    mockListFiles.mockResolvedValue([
-      'US-001-story.md',
-      'US-002-story.md',
-    ]);
+    mockListFiles.mockResolvedValue(['US-001-story.md', 'US-002-story.md']);
     const id = await getNextId('/fake/dir', 'US');
     expect(id).toBe('US-003');
   });

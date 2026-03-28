@@ -1,7 +1,7 @@
 import path from 'node:path';
 import Handlebars from 'handlebars';
-import { readFile, fileExists } from '../utils/fs.js';
 import { getTemplatesDir } from '../utils/constants.js';
+import { readFile, fileExists } from '../utils/fs.js';
 import { logger } from '../utils/logger.js';
 
 const compiledCache = new Map<string, HandlebarsTemplateDelegate>();
@@ -9,7 +9,7 @@ const compiledCache = new Map<string, HandlebarsTemplateDelegate>();
 Handlebars.registerHelper('date', () => new Date().toISOString().split('T')[0]);
 
 Handlebars.registerHelper('uppercase', (str: string) =>
-  typeof str === 'string' ? str.toUpperCase() : ''
+  typeof str === 'string' ? str.toUpperCase() : '',
 );
 
 Handlebars.registerHelper('checkboxList', (items: string[]) => {
@@ -18,13 +18,13 @@ Handlebars.registerHelper('checkboxList', (items: string[]) => {
 });
 
 Handlebars.registerHelper('join', (arr: string[], sep: unknown) =>
-  Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : ''
+  Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : '',
 );
 
 export async function renderTemplate(
   templatePath: string,
   data: Record<string, unknown>,
-  overrideDir?: string
+  overrideDir?: string,
 ): Promise<string> {
   const fullPath = await resolveTemplatePath(templatePath, overrideDir);
   let compiled = compiledCache.get(fullPath);
@@ -39,10 +39,7 @@ export async function renderTemplate(
   return compiled(data);
 }
 
-async function resolveTemplatePath(
-  templatePath: string,
-  overrideDir?: string
-): Promise<string> {
+async function resolveTemplatePath(templatePath: string, overrideDir?: string): Promise<string> {
   if (overrideDir) {
     const overrideFull = path.join(overrideDir, templatePath);
     if (await fileExists(overrideFull)) {

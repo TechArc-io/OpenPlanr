@@ -119,10 +119,7 @@ describe('findArtifactTypeById', () => {
 
 describe('listArtifacts', () => {
   it('lists and parses artifact filenames', async () => {
-    mockListFiles.mockResolvedValue([
-      'EPIC-001-user-auth.md',
-      'EPIC-002-payments.md',
-    ]);
+    mockListFiles.mockResolvedValue(['EPIC-001-user-auth.md', 'EPIC-002-payments.md']);
 
     const result = await listArtifacts('/project', config, 'epic');
     expect(result).toHaveLength(2);
@@ -139,11 +136,7 @@ describe('listArtifacts', () => {
   });
 
   it('ignores non-matching filenames', async () => {
-    mockListFiles.mockResolvedValue([
-      'EPIC-001-auth.md',
-      'readme.md',
-      '.DS_Store',
-    ]);
+    mockListFiles.mockResolvedValue(['EPIC-001-auth.md', 'readme.md', '.DS_Store']);
 
     const result = await listArtifacts('/project', config, 'epic');
     expect(result).toHaveLength(1);
@@ -208,15 +201,15 @@ describe('updateArtifact', () => {
     await updateArtifact('/project', config, 'epic', 'EPIC-001', 'new content');
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining('EPIC-001-test.md'),
-      'new content'
+      'new content',
     );
   });
 
   it('throws when artifact not found', async () => {
     mockListFiles.mockResolvedValue([]);
-    await expect(
-      updateArtifact('/project', config, 'epic', 'EPIC-999', 'content')
-    ).rejects.toThrow('Artifact EPIC-999 not found');
+    await expect(updateArtifact('/project', config, 'epic', 'EPIC-999', 'content')).rejects.toThrow(
+      'Artifact EPIC-999 not found',
+    );
   });
 });
 
@@ -250,27 +243,29 @@ _No features created yet. Run \`planr feature create\` to generate._
     mockListFiles.mockResolvedValueOnce(['EPIC-001-test.md']);
 
     await addChildReference(
-      '/project', config, 'epic', 'EPIC-001',
-      'feature', 'FEAT-001', 'My Feature'
+      '/project',
+      config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-001',
+      'My Feature',
     );
 
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.any(String),
-      expect.stringContaining('- [FEAT-001: My Feature](../features/FEAT-001-my-feature.md)')
+      expect.stringContaining('- [FEAT-001: My Feature](../features/FEAT-001-my-feature.md)'),
     );
     // Placeholder should be gone
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.any(String),
-      expect.not.stringContaining('_No features created yet')
+      expect.not.stringContaining('_No features created yet'),
     );
   });
 
   it('does nothing when parent not found', async () => {
     mockListFiles.mockResolvedValueOnce([]); // readArtifactRaw finds nothing
-    await addChildReference(
-      '/project', config, 'epic', 'EPIC-999',
-      'feature', 'FEAT-001', 'Test'
-    );
+    await addChildReference('/project', config, 'epic', 'EPIC-999', 'feature', 'FEAT-001', 'Test');
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
 });

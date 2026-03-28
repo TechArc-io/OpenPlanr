@@ -27,10 +27,7 @@ import {
   saveCredential,
   _resetMigration,
 } from '../../src/services/credentials-service.js';
-import {
-  keychainBackend,
-  encryptedFileBackend,
-} from '../../src/services/credential-backends.js';
+import { keychainBackend, encryptedFileBackend } from '../../src/services/credential-backends.js';
 
 beforeEach(() => {
   _resetMigration();

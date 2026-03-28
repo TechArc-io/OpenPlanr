@@ -5,25 +5,54 @@
  * with relevant code context. Files larger than MAX_FILE_SIZE are skipped.
  */
 
-import path from 'node:path';
 import { readFile, readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
 
 const MAX_FILE_SIZE = 50_000; // 50KB per file
 const MAX_SNIPPET_CHARS = 3_000; // Truncate snippets to this length
 
 const SOURCE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-  '.py', '.go', '.rs', '.java', '.kt', '.swift',
-  '.vue', '.svelte', '.astro',
-  '.sql', '.graphql', '.gql',
-  '.css', '.scss', '.less',
-  '.json', '.yaml', '.yml', '.toml',
-  '.md', '.mdx',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.py',
+  '.go',
+  '.rs',
+  '.java',
+  '.kt',
+  '.swift',
+  '.vue',
+  '.svelte',
+  '.astro',
+  '.sql',
+  '.graphql',
+  '.gql',
+  '.css',
+  '.scss',
+  '.less',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.md',
+  '.mdx',
 ]);
 
 const IGNORED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'out', '.next',
-  '__pycache__', 'vendor', 'target', '.venv', 'coverage',
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  '.next',
+  '__pycache__',
+  'vendor',
+  'target',
+  '.venv',
+  'coverage',
 ]);
 
 /**
@@ -32,7 +61,7 @@ const IGNORED_DIRS = new Set([
  */
 export async function readProjectFile(
   projectDir: string,
-  relativePath: string
+  relativePath: string,
 ): Promise<string | null> {
   const fullPath = path.join(projectDir, relativePath);
 
@@ -52,7 +81,7 @@ export async function readProjectFile(
 export async function findRelatedFiles(
   projectDir: string,
   keywords: string[],
-  maxResults: number = 10
+  maxResults: number = 10,
 ): Promise<string[]> {
   if (keywords.length === 0) return [];
 
@@ -69,7 +98,7 @@ async function searchDir(
   keywords: string[],
   matches: string[],
   maxResults: number,
-  depth: number
+  depth: number,
 ): Promise<void> {
   if (depth > 5 || matches.length >= maxResults) return;
 
@@ -96,9 +125,7 @@ async function searchDir(
         const relativePath = path.relative(rootDir, fullPath);
         const lowerPath = relativePath.toLowerCase();
 
-        const isMatch = keywords.some(
-          (kw) => lowerEntry.includes(kw) || lowerPath.includes(kw)
-        );
+        const isMatch = keywords.some((kw) => lowerEntry.includes(kw) || lowerPath.includes(kw));
         if (isMatch) {
           matches.push(relativePath);
         }
@@ -121,7 +148,7 @@ function isSourceFile(filename: string): boolean {
 export async function readFileSnippets(
   projectDir: string,
   relativePaths: string[],
-  totalBudget: number = 12_000
+  totalBudget: number = 12_000,
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   let remaining = totalBudget;

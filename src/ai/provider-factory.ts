@@ -6,8 +6,8 @@
  * features are actually invoked.
  */
 
-import type { AIProvider, AIProviderConfig } from './types.js';
 import { AIError } from './errors.js';
+import type { AIProvider, AIProviderConfig } from './types.js';
 
 export async function createAIProvider(config: AIProviderConfig): Promise<AIProvider> {
   switch (config.provider) {
@@ -15,7 +15,7 @@ export async function createAIProvider(config: AIProviderConfig): Promise<AIProv
       if (!config.apiKey) {
         throw new AIError(
           'Anthropic API key is required. Run `planr config set-key anthropic` or set ANTHROPIC_API_KEY.',
-          'auth'
+          'auth',
         );
       }
       const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
@@ -26,7 +26,7 @@ export async function createAIProvider(config: AIProviderConfig): Promise<AIProv
       if (!config.apiKey) {
         throw new AIError(
           'OpenAI API key is required. Run `planr config set-key openai` or set OPENAI_API_KEY.',
-          'auth'
+          'auth',
         );
       }
       const { OpenAIProvider } = await import('./providers/openai-provider.js');
@@ -41,7 +41,7 @@ export async function createAIProvider(config: AIProviderConfig): Promise<AIProv
     default:
       throw new AIError(
         `Unknown AI provider: ${config.provider}. Supported: anthropic, openai, ollama.`,
-        'unknown'
+        'unknown',
       );
   }
 }

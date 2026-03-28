@@ -7,11 +7,17 @@
  */
 
 import type { ZodSchema } from 'zod';
-import type { AIProvider, AIMessage, AIRequestOptions, AIProviderConfig, AIUsage } from '../ai/types.js';
-import type { OpenPlanrConfig } from '../models/types.js';
 import { AIError } from '../ai/errors.js';
-import { resolveApiKey } from './credentials-service.js';
+import type {
+  AIProvider,
+  AIMessage,
+  AIRequestOptions,
+  AIProviderConfig,
+  AIUsage,
+} from '../ai/types.js';
+import type { OpenPlanrConfig } from '../models/types.js';
 import { createSpinner, formatUsage } from '../utils/logger.js';
+import { resolveApiKey } from './credentials-service.js';
 
 /**
  * Initialize an AI provider from project config.
@@ -21,7 +27,7 @@ export async function getAIProvider(config: OpenPlanrConfig): Promise<AIProvider
   if (!config.ai) {
     throw new AIError(
       'AI is not configured. Run `planr init` or `planr config set-provider <name>`.',
-      'auth'
+      'auth',
     );
   }
 
@@ -49,9 +55,7 @@ export function isAIConfigured(config: OpenPlanrConfig): boolean {
  * Stream AI output to the terminal in real time.
  * Returns the fully accumulated text once streaming completes.
  */
-export async function streamToTerminal(
-  stream: AsyncIterable<string>
-): Promise<string> {
+export async function streamToTerminal(stream: AsyncIterable<string>): Promise<string> {
   const chunks: string[] = [];
 
   for await (const chunk of stream) {
@@ -80,7 +84,7 @@ function throwTruncationError(usage: AIUsage, maxTokens?: number, isRetry = fals
   const limit = maxTokens != null ? maxTokens.toLocaleString() : 'default';
   throw new AIError(
     `${prefix} was truncated at ${usage.outputTokens.toLocaleString()} output tokens (hit max_tokens limit of ${limit}). Try reducing the input scope or increasing the token budget.`,
-    'invalid_response'
+    'invalid_response',
   );
 }
 
@@ -102,9 +106,9 @@ async function generateCore<T>(
   messages: AIMessage[],
   schema: ZodSchema<T>,
   requestOptions: AIRequestOptions,
-  fetchResponse: () => Promise<string>
+  fetchResponse: () => Promise<string>,
 ): Promise<AIGenerateResult<T>> {
-  let totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
+  const totalUsage: AIUsage = { inputTokens: 0, outputTokens: 0 };
 
   const spinner = createSpinner('Generating...');
   try {
@@ -145,7 +149,7 @@ async function generateCore<T>(
     spinner.stop();
     throw new AIError(
       `AI returned invalid JSON after retry: ${retryParsed.error}`,
-      'invalid_response'
+      'invalid_response',
     );
   } catch (err) {
     spinner.stop();
@@ -170,7 +174,7 @@ export async function generateJSON<T>(
   provider: AIProvider,
   messages: AIMessage[],
   schema: ZodSchema<T>,
-  options?: AIRequestOptions
+  options?: AIRequestOptions,
 ): Promise<AIGenerateResult<T>> {
   const requestOptions: AIRequestOptions = {
     temperature: 0.5,
@@ -179,7 +183,7 @@ export async function generateJSON<T>(
   };
 
   return generateCore(provider, messages, schema, requestOptions, () =>
-    provider.chatSync(messages, requestOptions)
+    provider.chatSync(messages, requestOptions),
   );
 }
 
@@ -191,7 +195,7 @@ export async function generateStreamingJSON<T>(
   provider: AIProvider,
   messages: AIMessage[],
   schema: ZodSchema<T>,
-  options?: AIRequestOptions
+  options?: AIRequestOptions,
 ): Promise<AIGenerateResult<T>> {
   const requestOptions: AIRequestOptions = {
     temperature: 0.5,
@@ -231,7 +235,7 @@ export function accumulateUsage(total: AIUsage, usage?: AIUsage): void {
 
 function tryParseAndValidate<T>(
   raw: string,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): { success: true; data: T } | { success: false; error: string } {
   try {
     const cleaned = extractJSON(raw);
@@ -242,9 +246,7 @@ function tryParseAndValidate<T>(
       return { success: true, data: result.data };
     }
 
-    const errors = result.error.issues
-      .map((i) => `  ${i.path.join('.')}: ${i.message}`)
-      .join('\n');
+    const errors = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     return { success: false, error: `Validation errors:\n${errors}` };
   } catch (err) {
     return { success: false, error: `JSON parse error: ${(err as Error).message}` };

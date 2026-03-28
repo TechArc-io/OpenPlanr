@@ -6,9 +6,9 @@
  * budget (~8K tokens ≈ 32K chars) to avoid prompt overflow.
  */
 
+import { findRelatedFiles, readFileSnippets } from './file-reader.js';
 import { detectTechStack, formatTechStack, type TechStack } from './stack-detector.js';
 import { generateFolderTree } from './tree-generator.js';
-import { findRelatedFiles, readFileSnippets } from './file-reader.js';
 
 const MAX_CONTEXT_CHARS = 32_000; // ~8K tokens
 
@@ -26,7 +26,7 @@ export interface CodebaseContext {
  */
 export async function buildCodebaseContext(
   projectDir: string,
-  keywords: string[] = []
+  keywords: string[] = [],
 ): Promise<CodebaseContext> {
   const [techStack, folderTree, relatedPaths] = await Promise.all([
     detectTechStack(projectDir),

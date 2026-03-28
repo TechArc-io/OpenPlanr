@@ -5,8 +5,12 @@
  * multiple features automatically. Use --manual for legacy mode.
  */
 
+import chalk from 'chalk';
 import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
+import { buildFeaturesPrompt } from '../../ai/prompts/prompt-builder.js';
+import { aiFeaturesResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
+import { TOKEN_BUDGETS } from '../../ai/types.js';
+import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
 import {
   createArtifact,
   listArtifacts,
@@ -15,13 +19,9 @@ import {
   resolveArtifactFilename,
   addChildReference,
 } from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptText, promptMultiText, promptConfirm } from '../../services/prompt-service.js';
-import { buildFeaturesPrompt } from '../../ai/prompts/prompt-builder.js';
-import { aiFeaturesResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
-import { TOKEN_BUDGETS } from '../../ai/types.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
 
 export function registerFeatureCommand(program: Command) {
   const feature = program.command('feature').description('Manage features');
@@ -80,7 +80,7 @@ async function createFeaturesWithAI(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
   epicId: string,
-  featureCount?: number
+  featureCount?: number,
 ) {
   logger.heading(`Create Features (AI-powered from ${epicId})`);
 
@@ -107,7 +107,7 @@ async function createFeaturesWithAI(
     }
     const continueCreate = await promptConfirm(
       'Generate additional features? (AI will avoid duplicates)',
-      false
+      false,
     );
     if (!continueCreate) {
       logger.info('Feature creation cancelled.');
@@ -122,7 +122,9 @@ async function createFeaturesWithAI(
   try {
     const provider = await getAIProvider(config);
     const messages = buildFeaturesPrompt(epicRaw, existingTitles, featureCount);
-    const { result } = await generateStreamingJSON(provider, messages, aiFeaturesResponseSchema, { maxTokens: TOKEN_BUDGETS.feature });
+    const { result } = await generateStreamingJSON(provider, messages, aiFeaturesResponseSchema, {
+      maxTokens: TOKEN_BUDGETS.feature,
+    });
 
     // Display generated features
     console.log(chalk.dim('━'.repeat(50)));
@@ -133,10 +135,7 @@ async function createFeaturesWithAI(
     });
     console.log(chalk.dim('━'.repeat(50)));
 
-    const confirmAll = await promptConfirm(
-      `Create all ${result.features.length} features?`,
-      true
-    );
+    const confirmAll = await promptConfirm(`Create all ${result.features.length} features?`, true);
 
     if (!confirmAll) {
       logger.info('Feature creation cancelled.');
@@ -164,7 +163,7 @@ async function createFeaturesWithAI(
           risks: feat.risks,
           successMetrics: feat.successMetrics,
           storyIds: [],
-        }
+        },
       );
       createdIds.push(id);
       await addChildReference(projectDir, config, 'epic', epicId, 'feature', id, feat.title);
@@ -193,33 +192,42 @@ async function createFeaturesWithAI(
 async function createFeatureManually(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
-  opts: Record<string, string>
+  opts: Record<string, string>,
 ) {
   logger.heading(`Create Feature (from ${opts.epic})`);
 
   const title = opts.title || (await promptText('Feature title:'));
   const owner = await promptText('Owner:', config.author);
   const overview = await promptText('Overview:');
-  const functionalRequirements = await promptMultiText('Functional requirements', 'comma-separated');
+  const functionalRequirements = await promptMultiText(
+    'Functional requirements',
+    'comma-separated',
+  );
   const dependencies = await promptText('Dependencies:', 'None');
   const technicalConsiderations = await promptText('Technical considerations:', 'None');
   const risks = await promptText('Risks:', 'None');
   const successMetrics = await promptText('Success metrics:');
 
   const epicFilename = await resolveArtifactFilename(projectDir, config, 'epic', opts.epic);
-  const { id, filePath } = await createArtifact(projectDir, config, 'feature', 'features/feature.md.hbs', {
-    title,
-    epicId: opts.epic,
-    epicFilename,
-    owner,
-    overview,
-    functionalRequirements,
-    dependencies,
-    technicalConsiderations,
-    risks,
-    successMetrics,
-    storyIds: [],
-  });
+  const { id, filePath } = await createArtifact(
+    projectDir,
+    config,
+    'feature',
+    'features/feature.md.hbs',
+    {
+      title,
+      epicId: opts.epic,
+      epicFilename,
+      owner,
+      overview,
+      functionalRequirements,
+      dependencies,
+      technicalConsiderations,
+      risks,
+      successMetrics,
+      storyIds: [],
+    },
+  );
 
   await addChildReference(projectDir, config, 'epic', opts.epic, 'feature', id, title);
   logger.success(`Created feature ${id}: ${title}`);

@@ -13,11 +13,7 @@
 
 import { ENV_KEY_MAP } from '../ai/types.js';
 import type { CredentialSource } from './credential-backends.js';
-import {
-  keychainBackend,
-  encryptedFileBackend,
-  legacyBackend,
-} from './credential-backends.js';
+import { keychainBackend, encryptedFileBackend, legacyBackend } from './credential-backends.js';
 
 // ---------------------------------------------------------------------------
 // Migration
@@ -96,7 +92,7 @@ export async function resolveApiKey(provider: string): Promise<string | undefine
 
 /** Resolve the source where the API key is stored. */
 export async function resolveApiKeySource(
-  provider: string
+  provider: string,
 ): Promise<{ key: string; source: CredentialSource } | undefined> {
   // Run one-time migration from legacy plaintext file
   await migrateCredentials();
@@ -104,7 +100,7 @@ export async function resolveApiKeySource(
   // 1. Environment variable
   const envVar = ENV_KEY_MAP[provider];
   if (envVar && process.env[envVar]) {
-    return { key: process.env[envVar]!, source: 'env' };
+    return { key: process.env[envVar], source: 'env' };
   }
 
   // 2. OS Keychain

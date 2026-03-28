@@ -6,14 +6,14 @@
  */
 
 import path from 'node:path';
+import type { OpenPlanrConfig } from '../models/types.js';
+import { readFile, listFiles } from '../utils/fs.js';
 import {
   readArtifact,
   readArtifactRaw,
   listArtifacts,
   getArtifactDir,
 } from './artifact-service.js';
-import { readFile, listFiles } from '../utils/fs.js';
-import type { OpenPlanrConfig } from '../models/types.js';
 
 export interface TasksPromptContext {
   /** One or more user stories to generate tasks from. */
@@ -39,7 +39,7 @@ export interface TasksPromptContext {
 export async function gatherStoryArtifacts(
   projectDir: string,
   config: OpenPlanrConfig,
-  storyId: string
+  storyId: string,
 ): Promise<TasksPromptContext> {
   const storyRaw = await readArtifactRaw(projectDir, config, 'story', storyId);
   if (!storyRaw) throw new Error(`Story ${storyId} not found.`);
@@ -84,7 +84,7 @@ export async function gatherStoryArtifacts(
 export async function gatherFeatureArtifacts(
   projectDir: string,
   config: OpenPlanrConfig,
-  featureId: string
+  featureId: string,
 ): Promise<TasksPromptContext> {
   const featureRaw = await readArtifactRaw(projectDir, config, 'feature', featureId);
   if (!featureRaw) throw new Error(`Feature ${featureId} not found.`);
@@ -117,7 +117,9 @@ export async function gatherFeatureArtifacts(
   }
 
   if (stories.length === 0) {
-    throw new Error(`No user stories found for feature ${featureId}. Create stories first with: planr story create --feature ${featureId}`);
+    throw new Error(
+      `No user stories found for feature ${featureId}. Create stories first with: planr story create --feature ${featureId}`,
+    );
   }
 
   // Read ADRs
@@ -136,7 +138,7 @@ export async function gatherFeatureArtifacts(
 async function findGherkinContent(
   projectDir: string,
   config: OpenPlanrConfig,
-  storyId: string
+  storyId: string,
 ): Promise<string | null> {
   const storyDir = path.join(projectDir, getArtifactDir(config, 'story'));
   const files = await listFiles(storyDir, new RegExp(`^${storyId}-gherkin\\.feature$`));
@@ -149,7 +151,7 @@ async function findGherkinContent(
  */
 async function readAllADRs(
   projectDir: string,
-  config: OpenPlanrConfig
+  config: OpenPlanrConfig,
 ): Promise<Array<{ id: string; content: string }>> {
   const adrs: Array<{ id: string; content: string }> = [];
   try {
@@ -167,7 +169,10 @@ async function readAllADRs(
 /**
  * Build formatted codebase context string from text content.
  */
-async function buildCodebaseStr(projectDir: string, textContent: string): Promise<string | undefined> {
+async function buildCodebaseStr(
+  projectDir: string,
+  textContent: string,
+): Promise<string | undefined> {
   try {
     const { buildCodebaseContext, formatCodebaseContext, extractKeywords } =
       await import('../ai/codebase/index.js');

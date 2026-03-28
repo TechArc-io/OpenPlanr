@@ -8,25 +8,24 @@
  * The `implement` subcommand delegates to a configured coding agent.
  */
 
+import chalk from 'chalk';
 import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
+import { buildTasksPrompt } from '../../ai/prompts/prompt-builder.js';
+import { aiTasksResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
+import { TOKEN_BUDGETS } from '../../ai/types.js';
+import type { OpenPlanrConfig } from '../../models/types.js';
+import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
+import { gatherStoryArtifacts, gatherFeatureArtifacts } from '../../services/artifact-gathering.js';
 import {
   createArtifact,
   listArtifacts,
   readArtifact,
   resolveArtifactFilename,
   addChildReference,
-  getArtifactDir,
 } from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptText, promptMultiText, promptConfirm } from '../../services/prompt-service.js';
-import { buildTasksPrompt } from '../../ai/prompts/prompt-builder.js';
-import { aiTasksResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
-import { TOKEN_BUDGETS } from '../../ai/types.js';
-import { gatherStoryArtifacts, gatherFeatureArtifacts } from '../../services/artifact-gathering.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
-import type { OpenPlanrConfig } from '../../models/types.js';
 
 export function registerTaskCommand(program: Command) {
   const task = program.command('task').description('Manage tasks');
@@ -35,7 +34,10 @@ export function registerTaskCommand(program: Command) {
     .command('create')
     .description('Create tasks from a user story or feature')
     .option('--story <storyId>', 'parent user story ID (e.g., US-001)')
-    .option('--feature <featureId>', 'parent feature ID — generates tasks from all stories (e.g., FEAT-001)')
+    .option(
+      '--feature <featureId>',
+      'parent feature ID — generates tasks from all stories (e.g., FEAT-001)',
+    )
     .option('--title <title>', 'task list title')
     .option('--manual', 'use manual interactive prompts instead of AI')
     .action(async (opts) => {
@@ -55,7 +57,9 @@ export function registerTaskCommand(program: Command) {
         }
 
         if (!isAIConfigured(config)) {
-          logger.error('AI must be configured for --feature mode. Run `planr config set-provider`.');
+          logger.error(
+            'AI must be configured for --feature mode. Run `planr config set-provider`.',
+          );
           process.exit(1);
         }
         await createTasksFromFeature(projectDir, config, opts.feature);
@@ -161,7 +165,11 @@ export function registerTaskCommand(program: Command) {
 
 function displayTaskPreview(result: {
   tasks: Array<{ id: string; title: string; subtasks?: Array<{ id: string; title: string }> }>;
-  acceptanceCriteriaMapping?: Array<{ criterion: string; sourceStoryId: string; taskIds: string[] }>;
+  acceptanceCriteriaMapping?: Array<{
+    criterion: string;
+    sourceStoryId: string;
+    taskIds: string[];
+  }>;
   relevantFiles?: Array<{ path: string; reason: string }>;
 }) {
   console.log(chalk.dim('━'.repeat(50)));
@@ -176,7 +184,9 @@ function displayTaskPreview(result: {
     console.log('');
     console.log(chalk.bold('  Acceptance Criteria Mapping:'));
     for (const ac of result.acceptanceCriteriaMapping) {
-      console.log(chalk.dim(`    ${ac.criterion} (${ac.sourceStoryId}) → [${ac.taskIds.join(', ')}]`));
+      console.log(
+        chalk.dim(`    ${ac.criterion} (${ac.sourceStoryId}) → [${ac.taskIds.join(', ')}]`),
+      );
     }
   }
 
@@ -208,14 +218,17 @@ function buildTaskItems(result: {
 
 function buildArtifactSources(
   ctx: import('../../services/artifact-gathering.js').TasksPromptContext,
-  config: OpenPlanrConfig
+  config: OpenPlanrConfig,
 ): Array<{ type: string; path: string }> {
   const sources: Array<{ type: string; path: string }> = [];
   for (const s of ctx.stories) {
     sources.push({ type: 'User Story', path: `${config.outputPaths.agile}/stories/${s.id}` });
   }
   for (const g of ctx.gherkinScenarios) {
-    sources.push({ type: 'Gherkin', path: `${config.outputPaths.agile}/stories/${g.storyId}-gherkin.feature` });
+    sources.push({
+      type: 'Gherkin',
+      path: `${config.outputPaths.agile}/stories/${g.storyId}-gherkin.feature`,
+    });
   }
   if (ctx.featureRaw) {
     sources.push({ type: 'Feature', path: `${config.outputPaths.agile}/features/` });
@@ -233,11 +246,7 @@ function buildArtifactSources(
 // AI-powered task creation from a single story
 // ---------------------------------------------------------------------------
 
-async function createTasksWithAI(
-  projectDir: string,
-  config: OpenPlanrConfig,
-  storyId: string
-) {
+async function createTasksWithAI(projectDir: string, config: OpenPlanrConfig, storyId: string) {
   logger.heading(`Create Tasks (AI-powered from ${storyId})`);
 
   // Warn if tasks already exist for this story
@@ -280,8 +289,12 @@ async function createTasksWithAI(
     const provider = await getAIProvider(config);
     ctx.scope = { type: 'story', id: storyId };
     const messages = buildTasksPrompt(ctx);
-    logger.debug(`Task prompt: ${messages.length} messages, user content ${messages[1]?.content.length ?? 0} chars`);
-    const { result } = await generateStreamingJSON(provider, messages, aiTasksResponseSchema, { maxTokens: TOKEN_BUDGETS.task });
+    logger.debug(
+      `Task prompt: ${messages.length} messages, user content ${messages[1]?.content.length ?? 0} chars`,
+    );
+    const { result } = await generateStreamingJSON(provider, messages, aiTasksResponseSchema, {
+      maxTokens: TOKEN_BUDGETS.task,
+    });
 
     displayTaskPreview(result);
 
@@ -297,15 +310,21 @@ async function createTasksWithAI(
     const artifactSources = buildArtifactSources(ctx, config);
     const storyFilename = await resolveArtifactFilename(projectDir, config, 'story', storyId);
 
-    const { id, filePath } = await createArtifact(projectDir, config, 'task', 'tasks/task-list.md.hbs', {
-      title: result.title,
-      storyId,
-      storyFilename,
-      tasks,
-      artifactSources,
-      acceptanceCriteriaMapping: result.acceptanceCriteriaMapping,
-      relevantFiles: result.relevantFiles,
-    });
+    const { id, filePath } = await createArtifact(
+      projectDir,
+      config,
+      'task',
+      'tasks/task-list.md.hbs',
+      {
+        title: result.title,
+        storyId,
+        storyFilename,
+        tasks,
+        artifactSources,
+        acceptanceCriteriaMapping: result.acceptanceCriteriaMapping,
+        relevantFiles: result.relevantFiles,
+      },
+    );
 
     await addChildReference(projectDir, config, 'story', storyId, 'task', id, result.title);
     logger.success(`Created task list ${id}: ${result.title}`);
@@ -336,7 +355,7 @@ async function createTasksWithAI(
 async function createTasksFromFeature(
   projectDir: string,
   config: OpenPlanrConfig,
-  featureId: string
+  featureId: string,
 ) {
   logger.heading(`Create Tasks (AI-powered from ${featureId} — all stories)`);
 
@@ -380,8 +399,12 @@ async function createTasksFromFeature(
     const provider = await getAIProvider(config);
     ctx.scope = { type: 'feature', id: featureId };
     const messages = buildTasksPrompt(ctx);
-    logger.debug(`Task prompt: ${messages.length} messages, user content ${messages[1]?.content.length ?? 0} chars`);
-    const { result } = await generateStreamingJSON(provider, messages, aiTasksResponseSchema, { maxTokens: TOKEN_BUDGETS.taskFeature });
+    logger.debug(
+      `Task prompt: ${messages.length} messages, user content ${messages[1]?.content.length ?? 0} chars`,
+    );
+    const { result } = await generateStreamingJSON(provider, messages, aiTasksResponseSchema, {
+      maxTokens: TOKEN_BUDGETS.taskFeature,
+    });
 
     displayTaskPreview(result);
 
@@ -397,15 +420,21 @@ async function createTasksFromFeature(
     const artifactSources = buildArtifactSources(ctx, config);
     const featureFilename = await resolveArtifactFilename(projectDir, config, 'feature', featureId);
 
-    const { id, filePath } = await createArtifact(projectDir, config, 'task', 'tasks/task-list.md.hbs', {
-      title: result.title,
-      featureId,
-      featureFilename,
-      tasks,
-      artifactSources,
-      acceptanceCriteriaMapping: result.acceptanceCriteriaMapping,
-      relevantFiles: result.relevantFiles,
-    });
+    const { id, filePath } = await createArtifact(
+      projectDir,
+      config,
+      'task',
+      'tasks/task-list.md.hbs',
+      {
+        title: result.title,
+        featureId,
+        featureFilename,
+        tasks,
+        artifactSources,
+        acceptanceCriteriaMapping: result.acceptanceCriteriaMapping,
+        relevantFiles: result.relevantFiles,
+      },
+    );
 
     // Add reference from each story to this task list
     for (const story of ctx.stories) {
@@ -440,14 +469,14 @@ async function createTasksFromFeature(
 async function createTasksManually(
   projectDir: string,
   config: OpenPlanrConfig,
-  opts: Record<string, string>
+  opts: Record<string, string>,
 ) {
   logger.heading(`Create Tasks (from ${opts.story})`);
 
   const title = opts.title || (await promptText('Task list title:', `Tasks for ${opts.story}`));
   const taskNames = await promptMultiText(
     'Enter task names',
-    'comma-separated, e.g.: Setup, Implement API, Write tests'
+    'comma-separated, e.g.: Setup, Implement API, Write tests',
   );
 
   const tasks = taskNames.map((name, i) => ({
@@ -458,12 +487,18 @@ async function createTasksManually(
   }));
 
   const storyFilename = await resolveArtifactFilename(projectDir, config, 'story', opts.story);
-  const { id, filePath } = await createArtifact(projectDir, config, 'task', 'tasks/task-list.md.hbs', {
-    title,
-    storyId: opts.story,
-    storyFilename,
-    tasks,
-  });
+  const { id, filePath } = await createArtifact(
+    projectDir,
+    config,
+    'task',
+    'tasks/task-list.md.hbs',
+    {
+      title,
+      storyId: opts.story,
+      storyFilename,
+      tasks,
+    },
+  );
 
   await addChildReference(projectDir, config, 'story', opts.story, 'task', id, title);
   logger.success(`Created task list ${id}: ${title}`);

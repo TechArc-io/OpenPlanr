@@ -5,8 +5,8 @@
  * without reading every file. Ignores common non-source directories.
  */
 
-import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -32,15 +32,11 @@ const IGNORED_DIRS = new Set([
   '.output',
 ]);
 
-const IGNORED_FILES = new Set([
-  '.DS_Store',
-  'Thumbs.db',
-  '.gitkeep',
-]);
+const IGNORED_FILES = new Set(['.DS_Store', 'Thumbs.db', '.gitkeep']);
 
 export async function generateFolderTree(
   projectDir: string,
-  maxDepth: number = 3
+  maxDepth: number = 3,
 ): Promise<string> {
   const lines: string[] = [];
   const rootName = path.basename(projectDir);
@@ -55,7 +51,7 @@ async function walkDir(
   prefix: string,
   maxDepth: number,
   currentDepth: number,
-  lines: string[]
+  lines: string[],
 ): Promise<void> {
   if (currentDepth >= maxDepth) return;
 
@@ -68,7 +64,7 @@ async function walkDir(
 
   // Filter and sort: directories first, then files
   const filtered = entries.filter(
-    (e) => !IGNORED_DIRS.has(e) && !IGNORED_FILES.has(e) && !e.startsWith('.')
+    (e) => !IGNORED_DIRS.has(e) && !IGNORED_FILES.has(e) && !e.startsWith('.'),
   );
 
   const dirs: string[] = [];
@@ -103,7 +99,7 @@ async function walkDir(
         prefix + childPrefix,
         maxDepth,
         currentDepth + 1,
-        lines
+        lines,
       );
     }
   }

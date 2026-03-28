@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { logger, setVerbose, isVerbose, formatUsage, createSpinner } from '../../src/utils/logger.js';
+import {
+  logger,
+  setVerbose,
+  isVerbose,
+  formatUsage,
+  createSpinner,
+} from '../../src/utils/logger.js';
 
 beforeEach(() => {
   setVerbose(false);

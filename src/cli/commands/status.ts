@@ -1,10 +1,9 @@
-import { Command } from 'commander';
-import { loadConfig } from '../../services/config-service.js';
-import { listArtifacts, readArtifact, readArtifactRaw } from '../../services/artifact-service.js';
-import { parseTaskMarkdown } from '../../agents/task-parser.js';
-import { logger } from '../../utils/logger.js';
 import chalk from 'chalk';
-import type { OpenPlanrConfig } from '../../models/types.js';
+import { Command } from 'commander';
+import { parseTaskMarkdown } from '../../agents/task-parser.js';
+import { listArtifacts, readArtifact, readArtifactRaw } from '../../services/artifact-service.js';
+import { loadConfig } from '../../services/config-service.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerStatusCommand(program: Command) {
   program
@@ -147,7 +146,7 @@ export function registerStatusCommand(program: Command) {
           const overallPct = Math.round((totalDone / totalSubtasks) * 100);
           console.log('');
           console.log(
-            `  ${colorByPercent(`Overall: ${totalDone}/${totalSubtasks} subtasks complete (${overallPct}%)`, overallPct)}`
+            `  ${colorByPercent(`Overall: ${totalDone}/${totalSubtasks} subtasks complete (${overallPct}%)`, overallPct)}`,
           );
         }
       }
@@ -156,8 +155,8 @@ export function registerStatusCommand(program: Command) {
       console.log('');
       console.log(
         chalk.dim(
-          `  Totals: ${epics.length} epics, ${features.length} features, ${stories.length} stories, ${tasks.length} task lists`
-        )
+          `  Totals: ${epics.length} epics, ${features.length} features, ${stories.length} stories, ${tasks.length} task lists`,
+        ),
       );
       logger.dim('Targets: ' + config.targets.join(', '));
       logger.dim('Artifacts: ' + config.outputPaths.agile + '/');
@@ -167,7 +166,7 @@ export function registerStatusCommand(program: Command) {
 function printSection(
   label: string,
   items: Array<{ id: string; title: string }>,
-  showAll: boolean
+  showAll: boolean,
 ) {
   const count = items.length;
   const icon = count > 0 ? '●' : '○';

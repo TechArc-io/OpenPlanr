@@ -5,12 +5,12 @@
  */
 
 import { Command } from 'commander';
+import { ENV_KEY_MAP } from '../../ai/types.js';
+import type { AIProviderName, CodingAgentName } from '../../models/types.js';
 import { loadConfig, saveConfig } from '../../services/config-service.js';
 import { saveCredential, resolveApiKeySource } from '../../services/credentials-service.js';
-import { ENV_KEY_MAP } from '../../ai/types.js';
 import { promptSelect, promptSecret } from '../../services/prompt-service.js';
 import { logger } from '../../utils/logger.js';
-import type { AIProviderName, CodingAgentName } from '../../models/types.js';
 
 export function registerConfigCommand(program: Command) {
   const config = program.command('config').description('Manage Planr configuration');
@@ -64,7 +64,8 @@ export function registerConfigCommand(program: Command) {
       const projectDir = program.opts().projectDir as string;
       const cfg = await loadConfig(projectDir);
 
-      const selected = (provider as AIProviderName) ||
+      const selected =
+        (provider as AIProviderName) ||
         (await promptSelect<AIProviderName>('AI provider:', [
           { name: 'Anthropic (Claude)', value: 'anthropic' },
           { name: 'OpenAI (GPT-4o)', value: 'openai' },
@@ -81,7 +82,8 @@ export function registerConfigCommand(program: Command) {
     .description('Store an API key securely')
     .argument('[provider]', 'anthropic or openai')
     .action(async (provider?: string) => {
-      const selected = provider ||
+      const selected =
+        provider ||
         (await promptSelect('Provider:', [
           { name: 'Anthropic', value: 'anthropic' },
           { name: 'OpenAI', value: 'openai' },
@@ -94,7 +96,8 @@ export function registerConfigCommand(program: Command) {
       }
 
       const storage = await saveCredential(selected, key.trim());
-      const where = storage === 'keychain' ? 'OS keychain' : 'encrypted file (~/.planr/credentials.enc)';
+      const where =
+        storage === 'keychain' ? 'OS keychain' : 'encrypted file (~/.planr/credentials.enc)';
       logger.success(`API key for ${selected} saved to ${where}`);
     });
 
@@ -124,7 +127,8 @@ export function registerConfigCommand(program: Command) {
       const projectDir = program.opts().projectDir as string;
       const cfg = await loadConfig(projectDir);
 
-      const selected = (agent as CodingAgentName) ||
+      const selected =
+        (agent as CodingAgentName) ||
         (await promptSelect<CodingAgentName>('Default coding agent:', [
           { name: 'Claude Code CLI', value: 'claude' },
           { name: 'Cursor', value: 'cursor' },

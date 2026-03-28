@@ -7,10 +7,10 @@
  * 3. Legacy plaintext file (~/.planr/credentials.json) — read-only, for migration
  */
 
-import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
 import { mkdir, writeFile, readFile, access, unlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,11 +143,7 @@ function encrypt(plaintext: string, key: Buffer): EncryptedEnvelope {
 }
 
 function decrypt(envelope: EncryptedEnvelope, key: Buffer): string {
-  const decipher = crypto.createDecipheriv(
-    'aes-256-gcm',
-    key,
-    Buffer.from(envelope.iv, 'hex')
-  );
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(envelope.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(envelope.tag, 'hex'));
   const decrypted = Buffer.concat([
     decipher.update(Buffer.from(envelope.data, 'hex')),

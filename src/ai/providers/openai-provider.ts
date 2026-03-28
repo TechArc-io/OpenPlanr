@@ -5,9 +5,9 @@
  * Also serves as the base for the Ollama provider (OpenAI-compatible API).
  */
 
+import { wrapProviderError } from '../errors.js';
 import type { AIProvider, AIMessage, AIRequestOptions, AIProviderName, AIUsage } from '../types.js';
 import { DEFAULT_MAX_TOKENS } from '../types.js';
-import { wrapProviderError } from '../errors.js';
 
 export class OpenAIProvider implements AIProvider {
   readonly name: AIProviderName = 'openai';

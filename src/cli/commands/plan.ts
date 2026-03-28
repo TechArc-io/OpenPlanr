@@ -11,9 +11,25 @@
  *   (no flag)          → creates epic first, then cascades
  */
 
-import { Command } from 'commander';
 import path from 'node:path';
-import { loadConfig } from '../../services/config-service.js';
+import chalk from 'chalk';
+import { Command } from 'commander';
+import {
+  buildEpicPrompt,
+  buildFeaturesPrompt,
+  buildStoriesPrompt,
+  buildTasksPrompt,
+} from '../../ai/prompts/prompt-builder.js';
+import {
+  aiEpicResponseSchema,
+  aiFeaturesResponseSchema,
+  aiStoriesResponseSchema,
+  aiTasksResponseSchema,
+} from '../../ai/schemas/ai-response-schemas.js';
+import type { AIProvider } from '../../ai/types.js';
+import { TOKEN_BUDGETS } from '../../ai/types.js';
+import type { OpenPlanrConfig } from '../../models/types.js';
+import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
 import {
   createArtifact,
   listArtifacts,
@@ -23,22 +39,11 @@ import {
   resolveArtifactFilename,
   addChildReference,
 } from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptText, promptConfirm } from '../../services/prompt-service.js';
 import { renderTemplate } from '../../services/template-service.js';
 import { writeFile } from '../../utils/fs.js';
-import { buildEpicPrompt, buildFeaturesPrompt, buildStoriesPrompt, buildTasksPrompt } from '../../ai/prompts/prompt-builder.js';
-import {
-  aiEpicResponseSchema,
-  aiFeaturesResponseSchema,
-  aiStoriesResponseSchema,
-  aiTasksResponseSchema,
-} from '../../ai/schemas/ai-response-schemas.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
-import type { OpenPlanrConfig } from '../../models/types.js';
-import type { AIProvider } from '../../ai/types.js';
-import { TOKEN_BUDGETS } from '../../ai/types.js';
 
 export function registerPlanCommand(program: Command) {
   program
@@ -52,7 +57,9 @@ export function registerPlanCommand(program: Command) {
       const config = await loadConfig(projectDir);
 
       if (!isAIConfigured(config)) {
-        logger.error('AI must be configured for the plan command. Run `planr config set-provider`.');
+        logger.error(
+          'AI must be configured for the plan command. Run `planr config set-provider`.',
+        );
         process.exit(1);
       }
 
@@ -83,11 +90,7 @@ export function registerPlanCommand(program: Command) {
     });
 }
 
-async function planFromScratch(
-  projectDir: string,
-  config: OpenPlanrConfig,
-  provider: AIProvider
-) {
+async function planFromScratch(projectDir: string, config: OpenPlanrConfig, provider: AIProvider) {
   logger.heading('Full Agile Planning Flow');
   logger.dim('Epic → Features → User Stories → Tasks\n');
 
@@ -99,7 +102,12 @@ async function planFromScratch(
 
   logger.dim('\n[1/4] Generating epic...');
   const epicMessages = buildEpicPrompt(brief, existingTitles);
-  const { result: epicData } = await generateStreamingJSON(provider, epicMessages, aiEpicResponseSchema, { maxTokens: TOKEN_BUDGETS.epic });
+  const { result: epicData } = await generateStreamingJSON(
+    provider,
+    epicMessages,
+    aiEpicResponseSchema,
+    { maxTokens: TOKEN_BUDGETS.epic },
+  );
 
   console.log(chalk.bold(`\n  Epic: ${epicData.title}`));
   console.log(chalk.dim(`  ${epicData.solutionOverview}`));
@@ -122,14 +130,13 @@ async function planFromScratch(
   logger.success(`Created ${epicId}: ${epicData.title}`);
 
   await planFromEpic(projectDir, config, provider, epicId);
-
 }
 
 async function planFromEpic(
   projectDir: string,
   config: OpenPlanrConfig,
   provider: AIProvider,
-  epicId: string
+  epicId: string,
 ) {
   // Step 2: Generate Features
   const epicRaw = await readArtifactRaw(projectDir, config, 'epic', epicId);
@@ -143,14 +150,22 @@ async function planFromEpic(
 
   logger.dim('\n[2/4] Generating features...');
   const featureMessages = buildFeaturesPrompt(epicRaw, existingFeatureTitles);
-  const { result: featureResult } = await generateStreamingJSON(provider, featureMessages, aiFeaturesResponseSchema, { maxTokens: TOKEN_BUDGETS.feature });
+  const { result: featureResult } = await generateStreamingJSON(
+    provider,
+    featureMessages,
+    aiFeaturesResponseSchema,
+    { maxTokens: TOKEN_BUDGETS.feature },
+  );
 
   console.log(chalk.bold(`\n  Generated ${featureResult.features.length} features:`));
   featureResult.features.forEach((f, i) => {
     console.log(chalk.dim(`    ${i + 1}. ${f.title}`));
   });
 
-  const continueFeatures = await promptConfirm(`Create all ${featureResult.features.length} features and continue?`, true);
+  const continueFeatures = await promptConfirm(
+    `Create all ${featureResult.features.length} features and continue?`,
+    true,
+  );
   if (!continueFeatures) {
     logger.info('Planning paused after epic.');
     return;
@@ -201,7 +216,7 @@ async function planFromFeature(
   projectDir: string,
   config: OpenPlanrConfig,
   provider: AIProvider,
-  featureId: string
+  featureId: string,
 ) {
   // Step 3: Generate Stories
   const featureRaw = await readArtifactRaw(projectDir, config, 'feature', featureId);
@@ -222,7 +237,12 @@ async function planFromFeature(
 
   logger.dim(`\n[3/4] Generating stories for ${featureId}...`);
   const storyMessages = buildStoriesPrompt(featureRaw, epicRaw, existingStoryTitles);
-  const { result: storyResult } = await generateStreamingJSON(provider, storyMessages, aiStoriesResponseSchema, { maxTokens: TOKEN_BUDGETS.story });
+  const { result: storyResult } = await generateStreamingJSON(
+    provider,
+    storyMessages,
+    aiStoriesResponseSchema,
+    { maxTokens: TOKEN_BUDGETS.story },
+  );
 
   console.log(chalk.dim(`  Generated ${storyResult.stories.length} stories for ${featureId}`));
 
@@ -231,15 +251,21 @@ async function planFromFeature(
   const featureFilename = await resolveArtifactFilename(projectDir, config, 'feature', featureId);
 
   for (const story of storyResult.stories) {
-    const { id, filePath } = await createArtifact(projectDir, config, 'story', 'stories/user-story.md.hbs', {
-      title: story.title,
-      featureId,
-      featureFilename,
-      role: story.role,
-      goal: story.goal,
-      benefit: story.benefit,
-      additionalNotes: story.additionalNotes || undefined,
-    });
+    const { id, filePath: _filePath } = await createArtifact(
+      projectDir,
+      config,
+      'story',
+      'stories/user-story.md.hbs',
+      {
+        title: story.title,
+        featureId,
+        featureFilename,
+        role: story.role,
+        goal: story.goal,
+        benefit: story.benefit,
+        additionalNotes: story.additionalNotes || undefined,
+      },
+    );
 
     // Gherkin file
     const gherkinContent = await renderTemplate(
@@ -251,10 +277,13 @@ async function planFromFeature(
         goal: story.goal,
         benefit: story.benefit,
         scenarios: story.gherkinScenarios.map((s) => ({
-          name: s.name, given: s.given, when: s.when, then: s.then,
+          name: s.name,
+          given: s.given,
+          when: s.when,
+          then: s.then,
         })),
       },
-      config.templateOverrides
+      config.templateOverrides,
     );
     await writeFile(path.join(storyDir, `${id}-gherkin.feature`), gherkinContent);
 
@@ -273,7 +302,7 @@ async function generateTasksForStory(
   projectDir: string,
   config: OpenPlanrConfig,
   provider: AIProvider,
-  storyId: string
+  storyId: string,
 ) {
   const { gatherStoryArtifacts } = await import('../../services/artifact-gathering.js');
 
@@ -288,7 +317,9 @@ async function generateTasksForStory(
   logger.dim(`\n[4/4] Generating tasks for ${storyId}...`);
   ctx.scope = { type: 'story', id: storyId };
   const taskMessages = buildTasksPrompt(ctx);
-  const { result } = await generateStreamingJSON(provider, taskMessages, aiTasksResponseSchema, { maxTokens: TOKEN_BUDGETS.plan });
+  const { result } = await generateStreamingJSON(provider, taskMessages, aiTasksResponseSchema, {
+    maxTokens: TOKEN_BUDGETS.plan,
+  });
 
   const tasks = result.tasks.map((tg) => ({
     id: tg.id,
@@ -307,10 +338,16 @@ async function generateTasksForStory(
   // Build artifact sources for traceability
   const artifactSources: Array<{ type: string; path: string }> = [];
   for (const s of ctx.stories) {
-    artifactSources.push({ type: 'User Story', path: `${config.outputPaths.agile}/stories/${s.id}` });
+    artifactSources.push({
+      type: 'User Story',
+      path: `${config.outputPaths.agile}/stories/${s.id}`,
+    });
   }
   for (const g of ctx.gherkinScenarios) {
-    artifactSources.push({ type: 'Gherkin', path: `${config.outputPaths.agile}/stories/${g.storyId}-gherkin.feature` });
+    artifactSources.push({
+      type: 'Gherkin',
+      path: `${config.outputPaths.agile}/stories/${g.storyId}-gherkin.feature`,
+    });
   }
   for (const a of ctx.adrs) {
     artifactSources.push({ type: 'ADR', path: `${config.outputPaths.agile}/adrs/${a.id}` });

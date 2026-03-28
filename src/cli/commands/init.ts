@@ -5,16 +5,21 @@
  * and optional AI provider setup.
  */
 
-import { Command } from 'commander';
 import path from 'node:path';
-import { createDefaultConfig, saveConfig } from '../../services/config-service.js';
-import { createChecklist } from '../../services/checklist-service.js';
-import { saveCredential } from '../../services/credentials-service.js';
-import { ensureDir, fileExists } from '../../utils/fs.js';
-import { CONFIG_FILENAME, ARTIFACT_DIRS } from '../../utils/constants.js';
-import { logger } from '../../utils/logger.js';
-import { promptText, promptConfirm, promptSelect, promptSecret } from '../../services/prompt-service.js';
+import { Command } from 'commander';
 import type { AIProviderName, CodingAgentName } from '../../models/types.js';
+import { createChecklist } from '../../services/checklist-service.js';
+import { createDefaultConfig, saveConfig } from '../../services/config-service.js';
+import { saveCredential } from '../../services/credentials-service.js';
+import {
+  promptText,
+  promptConfirm,
+  promptSelect,
+  promptSecret,
+} from '../../services/prompt-service.js';
+import { CONFIG_FILENAME, ARTIFACT_DIRS } from '../../utils/constants.js';
+import { ensureDir, fileExists } from '../../utils/fs.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerInitCommand(program: Command) {
   program
@@ -29,7 +34,7 @@ export function registerInitCommand(program: Command) {
       if (await fileExists(configPath)) {
         const overwrite = await promptConfirm(
           `${CONFIG_FILENAME} already exists. Overwrite?`,
-          false
+          false,
         );
         if (!overwrite) {
           logger.info('Init cancelled.');
@@ -59,14 +64,19 @@ export function registerInitCommand(program: Command) {
           if (provider === 'anthropic' || provider === 'openai') {
             const keyHint = provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
             const apiKey = await promptSecret(
-              `API key (or press Enter to set ${keyHint} env var later):`
+              `API key (or press Enter to set ${keyHint} env var later):`,
             );
             if (apiKey.trim()) {
               const storage = await saveCredential(provider, apiKey.trim());
-              const where = storage === 'keychain' ? 'OS keychain' : 'encrypted file (~/.planr/credentials.enc)';
+              const where =
+                storage === 'keychain'
+                  ? 'OS keychain'
+                  : 'encrypted file (~/.planr/credentials.enc)';
               logger.success(`API key saved to ${where}`);
             } else {
-              logger.dim(`  No key provided. Set ${keyHint} env var or run \`planr config set-key ${provider}\`.`);
+              logger.dim(
+                `  No key provided. Set ${keyHint} env var or run \`planr config set-key ${provider}\`.`,
+              );
             }
           }
 

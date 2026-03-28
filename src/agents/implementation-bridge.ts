@@ -10,17 +10,18 @@
  * 6. Dispatch to the configured coding agent
  */
 
-import type { OpenPlanrConfig, CodingAgentName } from '../models/types.js';
-import {
-  readArtifact,
-  readArtifactRaw,
-  getParentChain,
-} from '../services/artifact-service.js';
-import { createAgent } from './agent-factory.js';
-import { parseTaskMarkdown, findSubtasks, getNextPending, formatSubtaskList } from './task-parser.js';
-import { composeImplementationPrompt } from './prompt-composer.js';
-import { logger } from '../utils/logger.js';
 import chalk from 'chalk';
+import type { OpenPlanrConfig, CodingAgentName } from '../models/types.js';
+import { readArtifact, readArtifactRaw, getParentChain } from '../services/artifact-service.js';
+import { logger } from '../utils/logger.js';
+import { createAgent } from './agent-factory.js';
+import { composeImplementationPrompt } from './prompt-composer.js';
+import {
+  parseTaskMarkdown,
+  findSubtasks,
+  getNextPending,
+  formatSubtaskList,
+} from './task-parser.js';
 
 export interface ImplementOptions {
   subtask?: string;
@@ -34,7 +35,7 @@ export async function executeImplementation(
   projectDir: string,
   config: OpenPlanrConfig,
   taskId: string,
-  opts: ImplementOptions
+  opts: ImplementOptions,
 ): Promise<void> {
   // 1. Read the task artifact
   const taskData = await readArtifact(projectDir, config, 'task', taskId);
@@ -43,7 +44,7 @@ export async function executeImplementation(
     process.exit(1);
   }
 
-  const taskRaw = await readArtifactRaw(projectDir, config, 'task', taskId);
+  const _taskRaw = await readArtifactRaw(projectDir, config, 'task', taskId);
 
   logger.heading(`Implement: ${taskId}`);
 
@@ -104,7 +105,8 @@ export async function executeImplementation(
   if (parents.feature) {
     const featureId = parents.story?.data?.featureId as string | undefined;
     if (featureId) {
-      featureContent = (await readArtifactRaw(projectDir, config, 'feature', featureId)) || undefined;
+      featureContent =
+        (await readArtifactRaw(projectDir, config, 'feature', featureId)) || undefined;
       logger.debug(`Read parent feature ${featureId}`);
     }
   }
@@ -124,18 +126,16 @@ export async function executeImplementation(
     const { buildCodebaseContext, formatCodebaseContext, extractKeywords } =
       await import('../ai/codebase/index.js');
 
-    const textToAnalyze = [
-      taskData.content,
-      storyContent || '',
-      featureContent || '',
-    ].join(' ');
+    const textToAnalyze = [taskData.content, storyContent || '', featureContent || ''].join(' ');
 
     const keywords = extractKeywords(textToAnalyze);
     const ctx = await buildCodebaseContext(projectDir, keywords);
     codebaseContext = formatCodebaseContext(ctx);
 
     if (ctx.techStack) {
-      logger.debug(`Stack: ${ctx.techStack.language}${ctx.techStack.framework ? ' + ' + ctx.techStack.framework : ''}`);
+      logger.debug(
+        `Stack: ${ctx.techStack.language}${ctx.techStack.framework ? ' + ' + ctx.techStack.framework : ''}`,
+      );
     }
   } catch {
     // Codebase scanning is best-effort

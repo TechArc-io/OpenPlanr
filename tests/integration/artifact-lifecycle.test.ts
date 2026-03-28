@@ -115,7 +115,7 @@ Updated business value.
       'EPIC-001',
       'feature',
       'FEAT-001',
-      'New Feature'
+      'New Feature',
     );
 
     const raw = await readArtifactRaw(project.dir, project.config, 'epic', 'EPIC-001');
@@ -141,10 +141,22 @@ describe('parent-child hierarchy', () => {
 
     // Add references
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-001', 'Child Feature'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-001',
+      'Child Feature',
     );
     await addChildReference(
-      project.dir, project.config, 'feature', 'FEAT-001', 'story', 'US-001', 'Grandchild Story'
+      project.dir,
+      project.config,
+      'feature',
+      'FEAT-001',
+      'story',
+      'US-001',
+      'Grandchild Story',
     );
 
     // Verify epic → feature link
@@ -166,10 +178,22 @@ describe('parent-child hierarchy', () => {
     await writeSampleFeature(project.dir, project.config, 'FEAT-002', 'Feature Two', 'EPIC-001');
 
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-001', 'Feature One'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-001',
+      'Feature One',
     );
     await addChildReference(
-      project.dir, project.config, 'epic', 'EPIC-001', 'feature', 'FEAT-002', 'Feature Two'
+      project.dir,
+      project.config,
+      'epic',
+      'EPIC-001',
+      'feature',
+      'FEAT-002',
+      'Feature Two',
     );
 
     const epicRaw = await readArtifactRaw(project.dir, project.config, 'epic', 'EPIC-001');

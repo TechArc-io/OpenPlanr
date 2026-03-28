@@ -5,9 +5,13 @@
  * to generate user stories with Gherkin scenarios.
  */
 
-import { Command } from 'commander';
 import path from 'node:path';
-import { loadConfig } from '../../services/config-service.js';
+import chalk from 'chalk';
+import { Command } from 'commander';
+import { buildStoriesPrompt } from '../../ai/prompts/prompt-builder.js';
+import { aiStoriesResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
+import { TOKEN_BUDGETS } from '../../ai/types.js';
+import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
 import {
   createArtifact,
   listArtifacts,
@@ -17,15 +21,11 @@ import {
   resolveArtifactFilename,
   addChildReference,
 } from '../../services/artifact-service.js';
-import { isAIConfigured, getAIProvider, generateStreamingJSON } from '../../services/ai-service.js';
+import { loadConfig } from '../../services/config-service.js';
 import { promptText, promptConfirm } from '../../services/prompt-service.js';
 import { renderTemplate } from '../../services/template-service.js';
 import { writeFile } from '../../utils/fs.js';
-import { buildStoriesPrompt } from '../../ai/prompts/prompt-builder.js';
-import { aiStoriesResponseSchema } from '../../ai/schemas/ai-response-schemas.js';
-import { TOKEN_BUDGETS } from '../../ai/types.js';
 import { logger } from '../../utils/logger.js';
-import chalk from 'chalk';
 
 export function registerStoryCommand(program: Command) {
   const story = program.command('story').description('Manage user stories');
@@ -34,7 +34,10 @@ export function registerStoryCommand(program: Command) {
     .command('create')
     .description('Create user stories from a feature or all features under an epic')
     .option('--feature <featureId>', 'parent feature ID (e.g., FEAT-001)')
-    .option('--epic <epicId>', 'parent epic ID — generates stories for ALL features under this epic')
+    .option(
+      '--epic <epicId>',
+      'parent epic ID — generates stories for ALL features under this epic',
+    )
     .option('--title <title>', 'story title (manual mode only)')
     .option('--manual', 'use manual interactive prompts instead of AI')
     .action(async (opts) => {
@@ -79,7 +82,9 @@ export function registerStoryCommand(program: Command) {
         }
 
         if (epicFeatures.length === 0) {
-          logger.error(`No features found under ${opts.epic}. Create features first with \`planr feature create --epic ${opts.epic}\`.`);
+          logger.error(
+            `No features found under ${opts.epic}. Create features first with \`planr feature create --epic ${opts.epic}\`.`,
+          );
           process.exit(1);
         }
 
@@ -92,7 +97,7 @@ export function registerStoryCommand(program: Command) {
 
         const confirmBatch = await promptConfirm(
           `Generate stories for all ${epicFeatures.length} features?`,
-          true
+          true,
         );
         if (!confirmBatch) {
           logger.info('Batch story generation cancelled.');
@@ -107,7 +112,9 @@ export function registerStoryCommand(program: Command) {
 
         console.log('');
         console.log(chalk.dim('━'.repeat(50)));
-        logger.success(`Batch complete: created ${totalCreated} stories across ${epicFeatures.length} features.`);
+        logger.success(
+          `Batch complete: created ${totalCreated} stories across ${epicFeatures.length} features.`,
+        );
         logger.dim('');
         logger.heading('Next steps:');
         logger.dim('  1. planr story list                          — View all stories');
@@ -178,7 +185,7 @@ export function registerStoryCommand(program: Command) {
 async function createStoriesWithAI(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
-  featureId: string
+  featureId: string,
 ): Promise<number> {
   logger.heading(`Create User Stories (AI-powered from ${featureId})`);
 
@@ -213,7 +220,7 @@ async function createStoriesWithAI(
     }
     const continueCreate = await promptConfirm(
       'Generate additional stories? (AI will avoid duplicates)',
-      false
+      false,
     );
     if (!continueCreate) {
       logger.info('Story creation cancelled.');
@@ -228,7 +235,9 @@ async function createStoriesWithAI(
   try {
     const provider = await getAIProvider(config);
     const messages = buildStoriesPrompt(featureRaw, epicRaw, existingTitles);
-    const { result } = await generateStreamingJSON(provider, messages, aiStoriesResponseSchema, { maxTokens: TOKEN_BUDGETS.story });
+    const { result } = await generateStreamingJSON(provider, messages, aiStoriesResponseSchema, {
+      maxTokens: TOKEN_BUDGETS.story,
+    });
 
     // Display generated stories
     console.log(chalk.dim('━'.repeat(50)));
@@ -242,7 +251,7 @@ async function createStoriesWithAI(
 
     const confirmAll = await promptConfirm(
       `Create all ${result.stories.length} user stories?`,
-      true
+      true,
     );
 
     if (!confirmAll) {
@@ -269,7 +278,7 @@ async function createStoriesWithAI(
           goal: story.goal,
           benefit: story.benefit,
           additionalNotes: story.additionalNotes || undefined,
-        }
+        },
       );
 
       // Create companion Gherkin file
@@ -288,7 +297,7 @@ async function createStoriesWithAI(
             then: s.then,
           })),
         },
-        config.templateOverrides
+        config.templateOverrides,
       );
       const gherkinPath = path.join(storyDir, `${id}-gherkin.feature`);
       await writeFile(gherkinPath, gherkinContent);
@@ -301,7 +310,9 @@ async function createStoriesWithAI(
 
     logger.dim('');
     logger.heading('Next steps:');
-    logger.dim(`  1. planr task create --story ${createdIds[0]}      — Generate implementation tasks`);
+    logger.dim(
+      `  1. planr task create --story ${createdIds[0]}      — Generate implementation tasks`,
+    );
     logger.dim(`  2. planr task implement TASK-*              — Implement with your coding agent`);
 
     return createdIds.length;
@@ -319,7 +330,7 @@ async function createStoriesWithAI(
 async function createStoryManually(
   projectDir: string,
   config: import('../../models/types.js').OpenPlanrConfig,
-  opts: Record<string, string>
+  opts: Record<string, string>,
 ) {
   logger.heading(`Create User Story (from ${opts.feature})`);
 
@@ -329,7 +340,12 @@ async function createStoryManually(
   const benefit = await promptText('So that (benefit):');
   const additionalNotes = await promptText('Additional notes:', '');
 
-  const featureFilename = await resolveArtifactFilename(projectDir, config, 'feature', opts.feature);
+  const featureFilename = await resolveArtifactFilename(
+    projectDir,
+    config,
+    'feature',
+    opts.feature,
+  );
   const { id, filePath } = await createArtifact(
     projectDir,
     config,
@@ -343,7 +359,7 @@ async function createStoryManually(
       goal,
       benefit,
       additionalNotes: additionalNotes || undefined,
-    }
+    },
   );
 
   // Create companion Gherkin file
@@ -365,7 +381,7 @@ async function createStoryManually(
         },
       ],
     },
-    config.templateOverrides
+    config.templateOverrides,
   );
   const gherkinPath = path.join(storyDir, `${id}-gherkin.feature`);
   await writeFile(gherkinPath, gherkinContent);
