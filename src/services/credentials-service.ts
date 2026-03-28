@@ -31,25 +31,33 @@ let migrationDone = false;
  */
 export async function migrateCredentials(): Promise<boolean> {
   if (migrationDone) return false;
+
+  // Prevent re-entrant calls while migration is in progress
   migrationDone = true;
 
-  if (!(await legacyBackend.exists())) return false;
+  try {
+    if (!(await legacyBackend.exists())) return false;
 
-  const credentials = await legacyBackend.loadAll();
-  const providers = Object.keys(credentials);
-  if (providers.length === 0) {
+    const credentials = await legacyBackend.loadAll();
+    const providers = Object.keys(credentials);
+    if (providers.length === 0) {
+      await legacyBackend.remove();
+      return false;
+    }
+
+    // Migrate each key to the best available backend
+    for (const provider of providers) {
+      await saveCredential(provider, credentials[provider]);
+    }
+
+    // Remove the plaintext file only after all keys migrated successfully
     await legacyBackend.remove();
+    return true;
+  } catch {
+    // Migration failed — reset flag so it retries next time
+    migrationDone = false;
     return false;
   }
-
-  // Migrate each key to the best available backend
-  for (const provider of providers) {
-    await saveCredential(provider, credentials[provider]);
-  }
-
-  // Remove the plaintext file
-  await legacyBackend.remove();
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +98,9 @@ export async function resolveApiKey(provider: string): Promise<string | undefine
 export async function resolveApiKeySource(
   provider: string
 ): Promise<{ key: string; source: CredentialSource } | undefined> {
+  // Run one-time migration from legacy plaintext file
+  await migrateCredentials();
+
   // 1. Environment variable
   const envVar = ENV_KEY_MAP[provider];
   if (envVar && process.env[envVar]) {
@@ -115,8 +126,13 @@ export async function resolveApiKeySource(
  */
 export async function saveCredential(provider: string, apiKey: string): Promise<CredentialSource> {
   if (await keychainBackend.isAvailable()) {
-    await keychainBackend.set(provider, apiKey);
-    return 'keychain';
+    try {
+      await keychainBackend.set(provider, apiKey);
+      return 'keychain';
+    } catch {
+      // Keychain write failed (locked, permission error, transient failure).
+      // Fall through to encrypted file backend.
+    }
   }
 
   await encryptedFileBackend.set(provider, apiKey);

@@ -174,6 +174,15 @@ export class EncryptedFileBackend implements CredentialBackend {
       const json = decrypt(envelope, key);
       return JSON.parse(json) as Record<string, string>;
     } catch {
+      // Backup corrupted/unreadable file before it gets overwritten by a
+      // subsequent set() call — avoids silent credential loss.
+      try {
+        const backupPath = `${ENC_FILE}.bak`;
+        const raw = await readFile(ENC_FILE);
+        await writeFile(backupPath, raw, { mode: 0o600 });
+      } catch {
+        // Best-effort backup; ignore if it fails too
+      }
       return {};
     }
   }
