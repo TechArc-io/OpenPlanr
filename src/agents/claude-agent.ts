@@ -1,11 +1,9 @@
 /**
  * Claude Code CLI agent adapter.
  *
- * Invokes the `claude` CLI binary with --print mode, writing the
- * prompt to a temp file and piping it via stdin. Output streams
- * directly to the user's terminal for real-time feedback.
- *
- * Includes retry logic for transient API errors (e.g. 400/429/500).
+ * Spawns `claude --print` with stream-json output, showing real-time
+ * progress via the shared progress spinner. Includes automatic retry
+ * for transient API errors.
  */
 
 import { spawn } from 'node:child_process';
@@ -13,32 +11,45 @@ import { createReadStream } from 'node:fs';
 import { unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import chalk from 'chalk';
+import { createProgressSpinner, describeActivity, type StreamEvent } from './progress.js';
 import type { AgentOptions, AgentResult, CodingAgent } from './types.js';
-import { which } from './utils.js';
+import { isRetryableError, MAX_RETRIES, RETRY_DELAY_MS, sleep, which } from './utils.js';
 
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 3000;
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-/** Patterns in stderr that indicate a transient/retryable API error */
-const RETRYABLE_PATTERNS = [
-  'tool use concurrency',
-  'overloaded',
-  '429',
-  '500',
-  '503',
-  'rate limit',
-  'ECONNRESET',
-  'socket hang up',
-];
+/**
+ * Default tool set — we use all standard tools. Claude Code already
+ * enforces CWD sandboxing and default permission checks. The safety
+ * prompt below handles project-scoped constraints.
+ */
+const ALLOWED_TOOLS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep'] as const;
 
-function isRetryableError(stderr: string): boolean {
-  const lower = stderr.toLowerCase();
-  return RETRYABLE_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
+const SAFETY_PROMPT = [
+  'IMPORTANT SAFETY RULES:',
+  '1. NEVER run system-wide destructive commands: docker system prune, docker volume prune, docker image prune -a, or similar commands that affect resources beyond this project.',
+  '2. For docker cleanup, ONLY use project-scoped commands: docker compose down, docker compose rm.',
+  '3. NEVER run sudo or any privilege escalation.',
+  '4. NEVER run rm -rf on directories you did not create in this session.',
+  '5. When unsure if a command is destructive, explain what you would run and ask the user to execute it manually.',
+].join('\n');
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Write prompt to a temp file to avoid ARG_MAX / backpressure issues */
+async function writeTempPrompt(prompt: string): Promise<string> {
+  const tmpFile = path.join(tmpdir(), `planr-prompt-${Date.now()}.txt`);
+  await writeFile(tmpFile, prompt, 'utf-8');
+  return tmpFile;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// ---------------------------------------------------------------------------
+// Agent
+// ---------------------------------------------------------------------------
 
 export class ClaudeAgent implements CodingAgent {
   readonly name = 'claude';
@@ -48,10 +59,7 @@ export class ClaudeAgent implements CodingAgent {
   }
 
   async execute(prompt: string, options: AgentOptions): Promise<AgentResult> {
-    // Write prompt to a temp file to avoid both ARG_MAX limits and
-    // Node.js stream backpressure issues with large prompts
-    const tmpFile = path.join(tmpdir(), `planr-prompt-${Date.now()}.txt`);
-    await writeFile(tmpFile, prompt, 'utf-8');
+    const tmpFile = await writeTempPrompt(prompt);
 
     try {
       let lastExitCode = 1;
@@ -65,66 +73,146 @@ export class ClaudeAgent implements CodingAgent {
           await sleep(RETRY_DELAY_MS * attempt);
         }
 
-        const result = await this.spawn(tmpFile, options);
+        const result = await this.spawnClaude(tmpFile, options);
         lastExitCode = result.exitCode;
 
-        // Success — return immediately
-        if (result.exitCode === 0) {
-          return { output: '', exitCode: 0 };
-        }
-
-        // Check if the error is retryable
-        if (result.stderr && isRetryableError(result.stderr)) {
-          continue;
-        }
-
-        // Non-retryable error — return as-is
-        return { output: '', exitCode: result.exitCode };
+        if (result.exitCode === 0) return result;
+        if (result.stderr && isRetryableError(result.stderr)) continue;
+        return result;
       }
 
-      // Exhausted retries
       return { output: '', exitCode: lastExitCode };
     } finally {
       await unlink(tmpFile).catch(() => {});
     }
   }
 
-  private spawn(
+  // -------------------------------------------------------------------------
+  // Private
+  // -------------------------------------------------------------------------
+
+  private spawnClaude(
     tmpFile: string,
     options: AgentOptions,
-  ): Promise<{ output: string; exitCode: number; stderr: string }> {
+  ): Promise<AgentResult & { stderr: string }> {
     return new Promise((resolve, reject) => {
-      const child = spawn('claude', ['--print'], {
+      const args = this.buildArgs(options);
+
+      const child = spawn('claude', args, {
         cwd: options.cwd,
-        // stdin: pipe from temp file; stdout: inherit for real-time; stderr: pipe to capture errors
-        stdio: ['pipe', 'inherit', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
       });
 
-      // Stream the temp file into stdin — handles backpressure correctly
       const fileStream = createReadStream(tmpFile, 'utf-8');
       fileStream.pipe(child.stdin);
 
-      const stderrChunks: string[] = [];
-
-      child.stderr?.on('data', (data: Buffer) => {
-        const text = data.toString();
-        stderrChunks.push(text);
-        // Still show stderr to the user in real-time
-        process.stderr.write(text);
-      });
+      const { spinner, stderrChunks, resultRef, statsRef } = this.attachListeners(child);
 
       child.on('error', (err) => {
+        spinner.stop();
         reject(new Error(`Failed to launch claude CLI: ${err.message}`));
       });
 
       child.on('close', (code) => {
+        spinner.stop();
+        this.printSummary(resultRef.text, statsRef, stderrChunks, code);
+
         resolve({
-          output: '',
+          output: resultRef.text,
           exitCode: code ?? 1,
           stderr: stderrChunks.join(''),
         });
       });
     });
+  }
+
+  private buildArgs(options: AgentOptions): string[] {
+    const args = [
+      '--print',
+      '--verbose',
+      '--output-format',
+      'stream-json',
+      '--allowedTools',
+      ...ALLOWED_TOOLS,
+      '--append-system-prompt',
+      SAFETY_PROMPT,
+    ];
+
+    if (options.continueSession) {
+      args.push('--continue');
+    }
+
+    return args;
+  }
+
+  private attachListeners(child: ReturnType<typeof spawn>) {
+    const spinner = createProgressSpinner();
+    const stderrChunks: string[] = [];
+    const resultRef = { text: '' };
+    const statsRef = { filesCreated: 0, filesEdited: 0 };
+    let jsonBuffer = '';
+
+    child.stdout?.on('data', (data: Buffer) => {
+      jsonBuffer += data.toString();
+      const lines = jsonBuffer.split('\n');
+      jsonBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const event = JSON.parse(trimmed) as StreamEvent;
+
+          const activity = describeActivity(event);
+          if (activity) {
+            spinner.setActivity(activity);
+            if (activity.startsWith('Creating ')) statsRef.filesCreated++;
+            if (activity.startsWith('Editing ')) statsRef.filesEdited++;
+            process.stderr.write(`\r\x1b[K${chalk.green('✓')} ${chalk.dim(activity)}\n`);
+          }
+
+          if (event.type === 'result') {
+            resultRef.text = event.result || '';
+          }
+        } catch {
+          // Incomplete JSON line — skip
+        }
+      }
+    });
+
+    child.stderr?.on('data', (data: Buffer) => {
+      stderrChunks.push(data.toString());
+    });
+
+    return { spinner, stderrChunks, resultRef, statsRef };
+  }
+
+  private printSummary(
+    resultText: string,
+    stats: { filesCreated: number; filesEdited: number },
+    stderrChunks: string[],
+    exitCode: number | null,
+  ) {
+    if (resultText) {
+      console.log(resultText);
+    }
+
+    const parts: string[] = [];
+    if (stats.filesCreated > 0) {
+      parts.push(`${stats.filesCreated} file${stats.filesCreated > 1 ? 's' : ''} created`);
+    }
+    if (stats.filesEdited > 0) {
+      parts.push(`${stats.filesEdited} file${stats.filesEdited > 1 ? 's' : ''} edited`);
+    }
+    if (parts.length > 0) {
+      console.log(chalk.dim(`\n📊 ${parts.join(', ')}`));
+    }
+
+    if (exitCode !== 0) {
+      const stderr = stderrChunks.join('');
+      if (stderr) process.stderr.write(stderr);
+    }
   }
 }
