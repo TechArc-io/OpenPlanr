@@ -9,6 +9,7 @@
  * via `planr quick promote`.
  */
 
+import path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { buildQuickTasksPrompt } from '../../ai/prompts/prompt-builder.js';
@@ -17,15 +18,21 @@ import { TOKEN_BUDGETS } from '../../ai/types.js';
 import type { OpenPlanrConfig } from '../../models/types.js';
 import { generateStreamingJSON, getAIProvider, isAIConfigured } from '../../services/ai-service.js';
 import {
+  addChildReference,
   createArtifact,
+  getArtifactDir,
   listArtifacts,
   readArtifact,
   readArtifactRaw,
+  resolveArtifactFilename,
   updateArtifact,
 } from '../../services/artifact-service.js';
 import { loadConfig } from '../../services/config-service.js';
+import { getNextId } from '../../services/id-service.js';
 import { promptConfirm, promptMultiText, promptText } from '../../services/prompt-service.js';
+import { ensureDir, writeFile } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
+import { slugify } from '../../utils/slugify.js';
 
 export function registerQuickCommand(program: Command) {
   const quick = program
@@ -357,27 +364,49 @@ async function promoteQuickTask(
     }
   }
 
-  // Create as a proper TASK artifact with the parent reference
-  const { id: newId, filePath } = await createArtifact(
-    projectDir,
-    config,
-    'task',
-    'tasks/task-list.md.hbs',
-    {
-      title,
-      storyId: opts.story,
-      featureId: opts.feature,
-      tasks: quickData.data.tasks || [],
-    },
-  );
+  // Generate a new TASK-xxx ID and write the file directly.
+  // We copy the raw markdown content (preserving all task checkboxes)
+  // instead of re-rendering through a template which would lose them.
+  const taskDir = path.join(projectDir, getArtifactDir(config, 'task'));
+  await ensureDir(taskDir);
+  const prefix = config.idPrefix.task || 'TASK';
+  const newId = await getNextId(taskDir, prefix);
+  const slug = slugify(title);
+  const filename = `${newId}-${slug}.md`;
+  const filePath = path.join(taskDir, filename);
 
+  // Transform the raw quick task markdown:
+  // 1. Replace QT-xxx ID with TASK-xxx throughout
+  let promoted = rawContent.replace(new RegExp(qtId, 'g'), newId);
+
+  // 2. Add storyId/featureId to frontmatter and body links
   if (opts.story) {
-    const { addChildReference } = await import('../../services/artifact-service.js');
+    const storyFilename = await resolveArtifactFilename(projectDir, config, 'story', opts.story);
+    promoted = promoted.replace(/^(title: .+)$/m, `$1\nstoryId: "${opts.story}"`);
+    const storyLink = `**User Story:** [${opts.story}](../stories/${storyFilename}.md)`;
+    promoted = promoted.replace(/^(# .+)$/m, `$1\n\n${storyLink}`);
+  }
+
+  if (opts.feature) {
+    const featFilename = await resolveArtifactFilename(projectDir, config, 'feature', opts.feature);
+    promoted = promoted.replace(/^(title: .+)$/m, `$1\nfeatureId: "${opts.feature}"`);
+    const featLink = `**Feature:** [${opts.feature}](../features/${featFilename}.md)`;
+    promoted = promoted.replace(/^(# .+)$/m, `$1\n\n${featLink}`);
+  }
+
+  // 3. Remove the quick-task promote hint
+  promoted = promoted.replace(/^_To move this into your agile hierarchy.*$/m, '');
+
+  await writeFile(filePath, promoted);
+
+  // Add reference from parent story/feature to the new task
+  if (opts.story) {
     await addChildReference(projectDir, config, 'story', opts.story, 'task', newId, title);
   }
 
   // Mark the original quick task as promoted
-  const promotedNote = `\n\n> **Promoted** to [${newId}](../tasks/${newId}.md) on ${new Date().toISOString().split('T')[0]}.\n`;
+  const today = new Date().toISOString().split('T')[0];
+  const promotedNote = `\n\n> **Promoted** to [${newId}](../tasks/${filename}) on ${today}.\n`;
   await updateArtifact(projectDir, config, 'quick', qtId, rawContent + promotedNote);
 
   logger.success(`Promoted ${qtId} → ${newId}`);
