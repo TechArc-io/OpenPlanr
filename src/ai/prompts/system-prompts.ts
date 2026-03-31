@@ -130,6 +130,26 @@ Tasks should:
 
 Respond with JSON only, no markdown or explanation.`;
 
+export const ESTIMATE_SYSTEM_PROMPT = `${BASE_PERSONA}
+
+Your task is to estimate the effort required for a software development artifact. Analyze the artifact content, any codebase context provided, and produce a structured effort estimate.
+
+You MUST respond with a valid JSON object containing:
+- "storyPoints": A Fibonacci number from the set [1, 2, 3, 5, 8, 13, 21] representing relative complexity
+- "estimatedHours": Estimated developer-hours as a number (e.g., 4.5)
+- "complexity": One of "low", "medium", "high"
+- "riskFactors": Array of 1-5 risk factors that could affect the estimate
+- "reasoning": 2-4 sentences explaining the estimate rationale
+- "assumptions": Array of 1-3 assumptions made during estimation
+
+Base your estimate on:
+- The scope and technical complexity of the work described
+- The codebase context (tech stack, existing patterns, affected files) when provided
+- Industry norms for similar work
+- The number and depth of subtasks if present
+
+Respond with JSON only, no markdown or explanation.`;
+
 export const REFINE_SYSTEM_PROMPT = `${BASE_PERSONA}
 
 Your task is to review and improve an existing agile artifact. Analyze the content and suggest improvements for:
