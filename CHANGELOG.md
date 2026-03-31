@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-03-31
+
+### Added
+
+- **`planr quick`** — standalone task lists without the full agile hierarchy (Epic → Feature → Story → Task). Ideal for prototyping, bug fixes, hackathons, or any work that doesn't need agile ceremony
+- **`planr quick create`** — AI generates a structured task list from a one-line description, with codebase-aware context and relevant file detection
+- **`planr quick --manual`** — interactive task entry without AI
+- **`planr quick list`** — list all quick task lists
+- **`planr quick implement`** — delegate to coding agent with `--next`, `-s <id>`, and all-at-once modes
+- **`planr quick fix`** — follow-up fix flow for quick tasks
+- **`planr quick promote`** — graduate a quick task into the agile hierarchy by attaching to a story or feature
+- **Auto-mark subtasks as done** — after a coding agent completes successfully, implemented subtask checkboxes are automatically checked off in the task markdown
+- **Quick tasks in `planr status`** — standalone quick tasks shown in their own section with completion metrics
+
+### Fixed
+
+- **Claude retry for stdout API errors** — "API Error: 400 due to tool use concurrency" was emitted via stdout (stream-json) rather than stderr, so the retry logic never caught it. Now checks both streams for retryable errors
+
+### Type System
+
+- Added `'quick'` to `ArtifactType` union
+- Made `TaskList.storyId` optional (quick tasks have no parent story)
+- Added `QT` prefix to ID system and `quick/` directory to artifact mapping
+
 ## [0.6.0] - 2026-03-29
 
 ### Added
