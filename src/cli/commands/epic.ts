@@ -28,7 +28,8 @@ export function registerEpicCommand(program: Command) {
   epic
     .command('create')
     .description('Create a new epic')
-    .option('--title <title>', 'epic title')
+    .option('--title <title>', 'epic title or brief description')
+    .option('--file <path>', 'read epic description from a file (e.g., a PRD)')
     .option('--owner <owner>', 'epic owner')
     .option('--manual', 'use manual interactive prompts instead of AI')
     .action(async (opts) => {
@@ -112,7 +113,17 @@ async function createEpicWithAI(
 ) {
   logger.heading('Create Epic (AI-powered)');
 
-  const brief = opts.title || (await promptText('Describe your epic in a sentence or two:'));
+  let brief: string;
+  if (opts.file) {
+    const { readFile } = await import('../../utils/fs.js');
+    const path = await import('node:path');
+    brief = await readFile(path.resolve(opts.file));
+    logger.dim(`Read ${brief.split('\n').length} lines from ${opts.file}`);
+  } else if (opts.title) {
+    brief = opts.title;
+  } else {
+    brief = await promptText('Describe your epic:');
+  }
 
   // Get existing epics for deduplication
   const existingEpics = await listArtifacts(projectDir, config, 'epic');
