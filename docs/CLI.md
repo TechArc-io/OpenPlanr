@@ -223,31 +223,34 @@ planr story list --feature FEAT-001    # filter by feature
 Create an implementation task list from a story or feature. With AI configured, gathers comprehensive context for intelligent task generation.
 
 ```bash
-planr task create --story US-001                    # from a single story
-planr task create --feature FEAT-001                # from all stories in a feature
+planr task create --story US-001                    # AI: one story + full planning context
+planr task create --feature FEAT-001                # AI: every story under feature + full context (higher output token budget)
 planr task create --story US-001 --title "Tasks"    # with custom title
-planr task create --story US-001 --manual           # manual mode
+planr task create --story US-001 --manual           # manual mode (story only; no AI)
 ```
 
 | Option | Description | Required |
 |--------|-------------|----------|
-| `--story <storyId>` | Create tasks from a single story | One of `--story` or `--feature` |
-| `--feature <featureId>` | Create tasks from all stories in a feature | One of `--story` or `--feature` |
+| `--story <storyId>` | AI tasks from one story | One of `--story` or `--feature` |
+| `--feature <featureId>` | AI tasks from **all** stories under the feature (single task list, linked from each story) | One of `--story` or `--feature` |
 | `--title <title>` | Task list title | No (AI generates it) |
-| `--manual` | Use manual interactive prompts instead of AI | No |
+| `--manual` | Manual interactive prompts instead of AI | No (`--story` only; `--feature` requires AI) |
 
 **What it gathers (AI mode):**
 
-When AI is configured, the command gathers comprehensive context:
-- User stories (one or all under a feature)
-- Gherkin acceptance criteria files
-- Parent feature and epic content
-- Architecture Decision Records (ADRs)
-- Codebase structure and tech stack
+Context is built by `gatherStoryArtifacts` / `gatherFeatureArtifacts` and passed to the same task-generation prompt. In both modes the model sees:
+
+- **User stories** — one story (`--story`) or every story linked to the feature (`--feature`)
+- **Gherkin** — `*-gherkin.feature` for each story included
+- **Parent feature** and **parent epic** markdown
+- **ADRs** — all architecture decision records in the project
+- **Codebase context** — tech stack / tree / related files derived from story text (and for `--feature`, from **all** story bodies plus the feature)
+
+`--feature` uses a larger completion budget (`taskFeature`, 32K tokens) than `--story` (`task`, 16K tokens) because the prompt and expected task list are typically bigger.
 
 The AI generates grouped subtasks with acceptance criteria mapping and relevant files.
 
-**Manual mode:** If AI is not configured, prompts for task names (comma-separated).
+**Manual mode:** If AI is not configured, `planr task create --story` prompts for task names (comma-separated). `--feature` always requires AI.
 
 **Output:** `docs/agile/tasks/TASK-001-<slug>.md`
 
@@ -528,8 +531,9 @@ planr init
        └─ planr feature create --epic EPIC-001
             └─ planr story create --feature FEAT-001   (single feature)
             └─ planr story create --epic EPIC-001     (all features at once)
-                 └─ planr task create --story US-001
-                      └─ planr task implement TASK-001
+                 ├─ planr task create --story US-001   (one story + feature/epic/Gherkin/ADRs/codebase)
+                 ├─ planr task create --feature FEAT-001   (all stories in feature + same artifact context; larger AI budget)
+                 └─ planr task implement TASK-001
 
 planr plan                  ← full automated flow (Epic → Features → Stories → Tasks)
 planr refine EPIC-001       ← AI review and improvement suggestions

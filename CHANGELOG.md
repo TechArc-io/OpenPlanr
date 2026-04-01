@@ -197,8 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`planr refine <ID>`** — AI-powered review and improvement suggestions
 - **`planr sync`** — validate and fix cross-references across artifacts
 - **`planr config show`** — display current configuration
-- **`planr task create --feature <ID>`** — create tasks from all stories in a feature
-- Feature-level task generation with comprehensive context gathering
+- **`planr task create --feature <ID>`** — AI task list from every story under the feature, with parent feature and epic, all Gherkin files for those stories, all ADRs, and codebase-derived context (higher output token budget than per-story task create)
+- Feature-level task generation shares the same rich context model as `--story`, aggregated across the feature
 
 ## [0.1.0] - 2026-03-26
 
@@ -209,7 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`planr epic create/list`** — create and list epics
 - **`planr feature create/list`** — create features from epics
 - **`planr story create/list`** — create user stories with Gherkin acceptance criteria
-- **`planr task create/list/implement`** — create task lists from stories
+- **`planr task create/list/implement`** — task lists from a story or from all stories in a feature (AI mode includes epic, feature, Gherkin, ADRs, codebase context)
 - **`planr checklist show/reset`** — agile development checklist
 - **`planr rules generate`** — generate AI agent rule files
   - Cursor (`.cursor/rules/*.mdc`)

@@ -64,7 +64,7 @@ planr config set-provider    # choose anthropic, openai, or ollama
 planr config set-key         # enter your API key
 ```
 
-Manual mode (no AI) is available for `planr epic create`, `planr feature create`, `planr story create`, and `planr task create`.
+Manual mode (no AI) is available for `planr epic create`, `planr feature create`, `planr story create`, and `planr task create --story`. `planr task create --feature` always requires AI.
 
 ---
 
