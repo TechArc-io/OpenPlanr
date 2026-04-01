@@ -56,6 +56,43 @@ interface ExportData {
 }
 
 // ---------------------------------------------------------------------------
+// Data collection helpers
+// ---------------------------------------------------------------------------
+
+/** Collect tasks linked to a story, marking them as used. */
+function collectTasksForStory(
+  storyId: string,
+  taskMap: Map<string, ExportArtifact & { storyId?: string; featureId?: string }>,
+  usedTaskIds: Set<string>,
+): ExportArtifact[] {
+  const tasks: ExportArtifact[] = [];
+  for (const [tId, t] of taskMap) {
+    if (t.storyId !== storyId) continue;
+    usedTaskIds.add(tId);
+    tasks.push(t);
+  }
+  return tasks;
+}
+
+/** Collect stories linked to a feature (with their tasks), marking them as used. */
+function collectStoriesForFeature(
+  featureId: string,
+  storyMap: Map<string, ExportArtifact & { featureId?: string }>,
+  taskMap: Map<string, ExportArtifact & { storyId?: string; featureId?: string }>,
+  usedStoryIds: Set<string>,
+  usedTaskIds: Set<string>,
+): ExportStory[] {
+  const stories: ExportStory[] = [];
+  for (const [sId, s] of storyMap) {
+    if (s.featureId !== featureId) continue;
+    usedStoryIds.add(sId);
+    const tasks = collectTasksForStory(sId, taskMap, usedTaskIds);
+    stories.push({ ...s, type: 'story', tasks });
+  }
+  return stories;
+}
+
+// ---------------------------------------------------------------------------
 // Data collection
 // ---------------------------------------------------------------------------
 
@@ -139,27 +176,18 @@ async function collectArtifacts(
       if (f.epicId !== e.id) continue;
       usedFeatureIds.add(fId);
 
-      const featureStories: ExportStory[] = [];
-
-      for (const [sId, s] of storyMap) {
-        if (s.featureId !== fId) continue;
-        usedStoryIds.add(sId);
-
-        const storyTasks: ExportArtifact[] = [];
-        for (const [tId, t] of taskMap) {
-          if (t.storyId !== sId) continue;
-          usedTaskIds.add(tId);
-          storyTasks.push(t);
-        }
-
-        featureStories.push({ ...s, type: 'story', tasks: storyTasks });
-      }
+      const featureStories = collectStoriesForFeature(
+        fId,
+        storyMap,
+        taskMap,
+        usedStoryIds,
+        usedTaskIds,
+      );
 
       // Tasks linked directly to feature (no story)
       for (const [tId, t] of taskMap) {
         if (t.featureId === fId && !t.storyId && !usedTaskIds.has(tId)) {
           usedTaskIds.add(tId);
-          // Attach as a story-less task under the feature
           featureStories.push({
             ...t,
             type: 'task' as ArtifactType,
@@ -185,35 +213,26 @@ async function collectArtifacts(
 
   // Orphaned artifacts (not part of any epic hierarchy)
   const orphanFeatures: ExportFeature[] = [];
-  for (const [fId, f] of featureMap) {
-    if (usedFeatureIds.has(fId) || (scopeEpicId && f.epicId !== scopeEpicId)) continue;
-    if (scopeEpicId) continue; // skip orphans when scoped
-    const featureStories: ExportStory[] = [];
-    for (const [sId, s] of storyMap) {
-      if (s.featureId !== fId) continue;
-      usedStoryIds.add(sId);
-      const storyTasks: ExportArtifact[] = [];
-      for (const [tId, t] of taskMap) {
-        if (t.storyId !== sId) continue;
-        usedTaskIds.add(tId);
-        storyTasks.push(t);
-      }
-      featureStories.push({ ...s, type: 'story', tasks: storyTasks });
+  if (!scopeEpicId) {
+    for (const [fId, f] of featureMap) {
+      if (usedFeatureIds.has(fId)) continue;
+      const featureStories = collectStoriesForFeature(
+        fId,
+        storyMap,
+        taskMap,
+        usedStoryIds,
+        usedTaskIds,
+      );
+      orphanFeatures.push({ ...f, type: 'feature', stories: featureStories });
     }
-    orphanFeatures.push({ ...f, type: 'feature', stories: featureStories });
   }
 
   const orphanStories: ExportStory[] = [];
   if (!scopeEpicId) {
     for (const [sId, s] of storyMap) {
       if (usedStoryIds.has(sId)) continue;
-      const storyTasks: ExportArtifact[] = [];
-      for (const [tId, t] of taskMap) {
-        if (t.storyId !== sId) continue;
-        usedTaskIds.add(tId);
-        storyTasks.push(t);
-      }
-      orphanStories.push({ ...s, type: 'story', tasks: storyTasks });
+      const tasks = collectTasksForStory(sId, taskMap, usedTaskIds);
+      orphanStories.push({ ...s, type: 'story', tasks });
     }
   }
 
@@ -327,8 +346,7 @@ export function registerExportCommand(program: Command) {
       }
 
       if (opts.scope) {
-        const scopeType = opts.scope.startsWith('EPIC') ? 'epic' : null;
-        if (!scopeType) {
+        if (!opts.scope.startsWith('EPIC')) {
           logger.error('--scope only supports epic IDs (e.g., EPIC-001)');
           process.exit(1);
         }
@@ -361,9 +379,6 @@ export function registerExportCommand(program: Command) {
       let filePath: string;
 
       switch (format) {
-        case 'markdown':
-          filePath = await exportMarkdown(data, outputPath, config.templateOverrides);
-          break;
         case 'json':
           filePath = await exportJSON(data, outputPath);
           break;
@@ -371,7 +386,8 @@ export function registerExportCommand(program: Command) {
           filePath = await exportHTML(data, outputPath, config.templateOverrides);
           break;
         default:
-          filePath = '';
+          // 'markdown' — validated above
+          filePath = await exportMarkdown(data, outputPath, config.templateOverrides);
       }
 
       console.log('');

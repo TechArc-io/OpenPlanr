@@ -38,7 +38,8 @@ import { parseMarkdown, toMarkdownWithFrontmatter } from '../../utils/markdown.j
 
 /** Inject or update a `githubIssue` field in raw artifact frontmatter. */
 function setFrontmatterField(raw: string, field: string, value: string | number): string {
-  const fieldRegex = new RegExp(`^${field}:.*\\n`, 'm');
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fieldRegex = new RegExp(`^${escaped}:.*\\n`, 'm');
   if (fieldRegex.test(raw)) {
     return raw.replace(fieldRegex, `${field}: ${value}\n`);
   }
@@ -249,13 +250,14 @@ export function registerGitHubCommand(program: Command) {
 
       let created = 0;
       let updated = 0;
+      const milestoneTitle = opts.epic
+        ? `${opts.epic}: ${(await readArtifact(projectDir, config, 'epic', opts.epic))?.data.title as string}`
+        : undefined;
 
       for (const id of artifactIds) {
         try {
           const result = await pushSingleArtifact(projectDir, config, id, {
-            milestone: opts.epic
-              ? `${opts.epic}: ${(await readArtifact(projectDir, config, 'epic', opts.epic))?.data.title as string}`
-              : undefined,
+            milestone: milestoneTitle,
           });
           if (result) {
             const icon = result.action === 'created' ? chalk.green('+') : chalk.yellow('~');

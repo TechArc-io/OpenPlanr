@@ -433,10 +433,11 @@ export async function getIssue(issueNumber: number): Promise<GitHubIssue> {
 }
 
 /**
- * List all open issues with planr labels.
+ * List all issues with planr labels.
  */
 export async function listPlanrIssues(
   state: 'open' | 'closed' | 'all' = 'all',
+  limit = 200,
 ): Promise<GitHubIssue[]> {
   const labels = Object.values(TYPE_LABELS).join(',');
   return ghJSON<GitHubIssue[]>([
@@ -449,7 +450,7 @@ export async function listPlanrIssues(
     '--json',
     'number,title,state,url,labels',
     '--limit',
-    '200',
+    String(limit),
   ]);
 }
 
@@ -457,13 +458,11 @@ export async function listPlanrIssues(
  * Create or get a GitHub milestone (used for epics).
  */
 export async function ensureMilestone(title: string): Promise<string> {
-  // Check if milestone exists
+  // Check if milestone already exists
   try {
     const milestones = await ghJSON<Array<{ title: string }>>([
       'api',
       'repos/{owner}/{repo}/milestones',
-      '--jq',
-      '.[].title',
     ]);
     if (Array.isArray(milestones) && milestones.some((m) => m.title === title)) {
       return title;
