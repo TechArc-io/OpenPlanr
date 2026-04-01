@@ -105,6 +105,49 @@ The override directory must mirror the default template structure (e.g., `my-tem
 
 ---
 
+## GitHub integration issues
+
+### "GitHub CLI (gh) is not installed"
+
+The `planr github` commands require the GitHub CLI. Install it:
+
+```bash
+# macOS
+brew install gh
+
+# Other platforms: https://cli.github.com/
+```
+
+### "Not authenticated with GitHub"
+
+You need to log in with `gh`:
+
+```bash
+gh auth login
+```
+
+### "No GitHub remote found"
+
+Your repository doesn't have a GitHub remote configured. Add one:
+
+```bash
+git remote add origin https://github.com/your-org/your-repo.git
+```
+
+### "Could not resolve to an issue"
+
+The linked GitHub issue was deleted. Planr handles this gracefully — it will create a new issue on the next push. If you see this error during sync, re-push the artifact:
+
+```bash
+planr github push EPIC-001
+```
+
+### Push creates duplicate issues
+
+Each artifact stores its linked issue number in frontmatter (`githubIssue: 123`). If you manually delete this field, a new issue will be created on the next push. Don't edit `githubIssue` fields manually.
+
+---
+
 ## Build and development issues
 
 ### "Cannot find module" errors after changes

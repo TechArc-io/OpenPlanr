@@ -215,7 +215,7 @@ async function createEpicWithAI(
     logger.heading('Next steps:');
     logger.dim(`  1. planr feature create --epic ${id}    — Break epic into features`);
     logger.dim(`  2. planr story create --feature FEAT-*   — Create user stories per feature`);
-    logger.dim(`  3. planr task create --story US-*        — Generate implementation tasks`);
+    logger.dim(`  3. planr task create --feature FEAT-*    — Generate implementation tasks`);
     logger.dim(`  4. planr task implement TASK-*           — Implement with your coding agent`);
     logger.dim('');
     logger.dim(`  Or run the full flow at once:`);

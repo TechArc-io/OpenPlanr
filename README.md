@@ -82,7 +82,7 @@ planr rules generate --dry-run        # preview
 | Command | Description |
 |---------|-------------|
 | `planr init` | Initialize project with config and directory structure |
-| `planr epic create` | Create a new epic |
+| `planr epic create` | Create a new epic (supports `--file <path>` for PRDs) |
 | `planr epic list` | List all epics |
 | `planr feature create --epic <ID>` | Create features from an epic |
 | `planr feature list` | List all features |
@@ -106,6 +106,10 @@ planr rules generate --dry-run        # preview
 | `planr config set-key` | Store API key securely |
 | `planr config set-model` | Set AI model |
 | `planr config set-agent` | Set default coding agent |
+| `planr github push [ID]` | Push artifacts to GitHub Issues (single, `--epic`, or `--all`) |
+| `planr github sync` | Bi-directional status sync with GitHub Issues |
+| `planr github status` | Show sync status of linked artifacts |
+| `planr export` | Export planning report (markdown, JSON, or HTML) |
 
 See [docs/CLI.md](docs/CLI.md) for the full command reference with all options and flags.
 

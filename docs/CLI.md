@@ -67,19 +67,23 @@ project-root/
 
 ### `planr epic create`
 
-Create a new epic. With AI configured, provide a brief description and the AI expands it into a full epic.
+Create a new epic. With AI configured, provide a brief description and the AI expands it into a full epic. Use `--file` to feed a detailed PRD or requirements document.
 
 ```bash
 planr epic create
 planr epic create --title "User Authentication" --owner "Engineering"
+planr epic create --file ./prd.md
 planr epic create --manual
 ```
 
 | Option | Description | Required |
 |--------|-------------|----------|
-| `--title <title>` | Epic title | No (prompts) |
+| `--title <title>` | Epic title or brief description | No (prompts) |
+| `--file <path>` | Read epic description from a file (e.g., a PRD) | No |
 | `--owner <owner>` | Epic owner | No (prompts) |
 | `--manual` | Use manual interactive prompts instead of AI | No |
+
+When `--file` is provided, the full file content is sent to the AI with document-extraction framing so that all requirements, features, and success criteria are incorporated into the generated epic.
 
 **Interactive prompts:**
 
@@ -521,6 +525,91 @@ planr config set-agent cursor            # set directly
 
 ---
 
+### `planr github push`
+
+Push planning artifacts to GitHub Issues. Requires `gh` CLI to be installed and authenticated (`gh auth login`).
+
+```bash
+planr github push EPIC-001              # push a single artifact
+planr github push --epic EPIC-001       # push all artifacts under an epic
+planr github push --all                 # push all artifacts
+```
+
+| Argument/Option | Description | Required |
+|-----------------|-------------|----------|
+| `[artifactId]` | Single artifact ID to push | One of `[artifactId]`, `--epic`, or `--all` |
+| `--epic <epicId>` | Push all artifacts under an epic | One of `[artifactId]`, `--epic`, or `--all` |
+| `--all` | Push all artifacts across all types | One of `[artifactId]`, `--epic`, or `--all` |
+
+**What it does:**
+- Creates a GitHub Issue for each artifact with type-specific formatting (metadata tables, section ordering, collapsible details)
+- Labels issues automatically (`planr:epic`, `planr:feature`, `planr:story`, `planr:task`)
+- Stores the GitHub issue number in artifact frontmatter (`githubIssue: 123`) for future syncing
+- On subsequent pushes, updates the existing issue instead of creating a duplicate
+- If a linked issue was deleted on GitHub, gracefully creates a new one
+
+---
+
+### `planr github sync`
+
+Bi-directional status sync between local artifacts and GitHub Issues.
+
+```bash
+planr github sync                       # interactive conflict resolution (both directions)
+planr github sync --direction pull      # GitHub → local (update local status from issue state)
+planr github sync --direction push      # local → GitHub (update issue state from local status)
+planr github sync --direction both      # both with interactive conflict resolution (default)
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--direction <dir>` | `pull`, `push`, or `both` | `both` |
+
+**Status mapping:**
+- GitHub `open` → local `in-progress` / `draft`
+- GitHub `closed` → local `done` / `accepted`
+- Local `done` → closes the GitHub issue
+- Conflicts (both changed) → interactive prompt to choose which side wins
+
+---
+
+### `planr github status`
+
+Show sync status of all linked artifacts.
+
+```bash
+planr github status
+```
+
+Displays a table of all artifacts that have a `githubIssue` field, showing local status vs GitHub issue state and whether they are in sync.
+
+---
+
+### `planr export`
+
+Generate a consolidated planning report in markdown, JSON, or HTML format.
+
+```bash
+planr export                                    # markdown report in current directory
+planr export --format html                      # self-contained HTML report
+planr export --format json                      # machine-readable JSON
+planr export --format html --scope EPIC-001     # only artifacts under one epic
+planr export --output ./reports                 # custom output directory
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--format <format>` | Output format: `markdown`, `json`, or `html` | `markdown` |
+| `--scope <epicId>` | Only export artifacts under a specific epic | All artifacts |
+| `--output <path>` | Output file or directory | `.` (current directory) |
+
+**Output formats:**
+- **Markdown** — hierarchical report with all artifact details, nested under epics → features → stories → tasks
+- **JSON** — structured data with full hierarchy, counts, and metadata for programmatic consumption
+- **HTML** — self-contained file with inline CSS, collapsible `<details>` sections, color-coded status badges, and full hierarchy rendering
+
+---
+
 ## Workflow
 
 The typical agile planning flow follows this hierarchy:
@@ -540,6 +629,9 @@ planr refine EPIC-001       ← AI review and improvement suggestions
 planr sync                  ← validate and fix cross-references
 planr rules generate        ← generate AI rules from your artifacts
 planr status                ← see progress overview
+planr github push --all     ← push artifacts to GitHub Issues
+planr github sync           ← bi-directional status sync with GitHub
+planr export --format html  ← generate planning report
 ```
 
 ---
