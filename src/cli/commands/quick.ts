@@ -203,12 +203,14 @@ async function createQuickWithAI(
   try {
     // Build optional codebase context
     let codebaseContext: string | undefined;
+    let rawCodebaseContext: import('../../ai/codebase/index.js').CodebaseContext | undefined;
     try {
       const { buildCodebaseContext, extractKeywords, formatCodebaseContext } = await import(
         '../../ai/codebase/index.js'
       );
       const keywords = extractKeywords(description);
       const ctx = await buildCodebaseContext(projectDir, keywords);
+      rawCodebaseContext = ctx;
       codebaseContext = formatCodebaseContext(ctx);
 
       const stackInfo = ctx.techStack
@@ -244,6 +246,31 @@ async function createQuickWithAI(
       }
     }
     console.log(chalk.dim('━'.repeat(50)));
+
+    // Validate AI output against codebase
+    if (rawCodebaseContext && result.relevantFiles?.length) {
+      try {
+        const { validateRelevantFiles, detectDependencyHints } = await import(
+          '../../ai/validation/index.js'
+        );
+        const hints = detectDependencyHints(rawCodebaseContext.architectureFiles);
+        const validation = validateRelevantFiles(
+          result.relevantFiles,
+          rawCodebaseContext.sourceInventory,
+          hints,
+        );
+        if (validation.warnings.length > 0) {
+          console.log('');
+          logger.warn('Quality warnings:');
+          for (const w of validation.warnings) {
+            console.log(chalk.yellow(`  ⚠ ${w}`));
+          }
+          console.log('');
+        }
+      } catch {
+        // Validation is best-effort
+      }
+    }
 
     const total = result.tasks.reduce((sum, t) => sum + (t.subtasks || []).length + 1, 0);
     const confirmCreate = await promptConfirm(`Create quick task list with ${total} items?`, true);

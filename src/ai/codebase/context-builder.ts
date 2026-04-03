@@ -12,6 +12,8 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { findRelatedFiles, readFileSnippets, readProjectFile } from './file-reader.js';
+import { detectPatternRules, type PatternRule } from './pattern-rules.js';
+import { readProjectRules } from './rules-reader.js';
 import { detectTechStack, formatTechStack, type TechStack } from './stack-detector.js';
 import { generateFolderTree } from './tree-generator.js';
 
@@ -26,6 +28,10 @@ export interface CodebaseContext {
   architectureFiles: Map<string, string>;
   /** Keyword-matched files relevant to the specific task. */
   relatedFiles: Map<string, string>;
+  /** User-defined rules from `.planr/rules.md`. */
+  projectRules: string | null;
+  /** Auto-detected architectural patterns. */
+  patternRules: PatternRule[];
 }
 
 // ---------------------------------------------------------------------------
@@ -159,14 +165,18 @@ export async function buildCodebaseContext(
   projectDir: string,
   keywords: string[] = [],
 ): Promise<CodebaseContext> {
-  const [techStack, folderTree, sourceInventory, relatedPaths, architectureFiles] =
+  const [techStack, folderTree, sourceInventory, relatedPaths, architectureFiles, projectRules] =
     await Promise.all([
       detectTechStack(projectDir),
       generateFolderTree(projectDir, 3),
       buildSourceInventory(projectDir),
       findRelatedFiles(projectDir, keywords, 8),
       findArchitectureFiles(projectDir),
+      readProjectRules(projectDir),
     ]);
+
+  // Detect patterns from architecture files (sync, fast)
+  const patternRules = detectPatternRules(architectureFiles, sourceInventory);
 
   // Remove architecture files from keyword results to avoid duplicates
   const archPaths = new Set(architectureFiles.keys());
@@ -174,7 +184,15 @@ export async function buildCodebaseContext(
 
   const relatedFiles = await readFileSnippets(projectDir, filteredRelated, 12_000);
 
-  return { techStack, folderTree, sourceInventory, architectureFiles, relatedFiles };
+  return {
+    techStack,
+    folderTree,
+    sourceInventory,
+    architectureFiles,
+    relatedFiles,
+    projectRules,
+    patternRules,
+  };
 }
 
 /**
@@ -183,6 +201,11 @@ export async function buildCodebaseContext(
  */
 export function formatCodebaseContext(ctx: CodebaseContext): string {
   const sections: string[] = [];
+
+  // Priority 0: User-defined project rules (always included, never dropped)
+  if (ctx.projectRules) {
+    sections.push(`## Project Rules (MANDATORY — follow these exactly)\n${ctx.projectRules}`);
+  }
 
   // Priority 1: Tech stack (always included, small)
   if (ctx.techStack) {
@@ -196,6 +219,15 @@ export function formatCodebaseContext(ctx: CodebaseContext): string {
       archBlocks.push(`### ${filePath}\n\`\`\`\n${content}\n\`\`\``);
     }
     sections.push(`## Architecture (IMPORTANT: follow these patterns)\n${archBlocks.join('\n\n')}`);
+  }
+
+  // Priority 2.5: Auto-detected pattern rules
+  if (ctx.patternRules.length > 0) {
+    const ruleBlocks = ctx.patternRules.map(
+      (r) =>
+        `### ${r.name}\n**Rule:** ${r.rule}\n**Anti-pattern:** ${r.antiPattern}\n**Evidence:** ${r.evidence.join(', ')}`,
+    );
+    sections.push(`## Detected Project Patterns (MUST follow)\n${ruleBlocks.join('\n\n')}`);
   }
 
   // Priority 3: Source file inventory (compact, never truncated)
@@ -226,15 +258,15 @@ export function formatCodebaseContext(ctx: CodebaseContext): string {
   }
 
   // Apply budget — drop from the end (lowest priority first)
-  // Sections: [0] tech stack, [1] architecture, [2] inventory, [3] tree, [4] related files
+  // Possible sections (some may be absent): rules, tech stack, architecture, inventory, tree, related files
   let result = sections.join('\n\n');
   if (result.length > MAX_CONTEXT_CHARS) {
-    // Drop keyword-matched files first, keep stack + arch + inventory + tree
-    result = sections.slice(0, 4).join('\n\n');
+    // Drop related files first (last section)
+    result = sections.slice(0, -1).join('\n\n');
   }
   if (result.length > MAX_CONTEXT_CHARS) {
-    // Drop tree, keep stack + arch + inventory
-    result = sections.slice(0, 3).join('\n\n');
+    // Drop tree too (second-to-last remaining)
+    result = sections.slice(0, -2).join('\n\n');
   }
   if (result.length > MAX_CONTEXT_CHARS) {
     result = `${result.slice(0, MAX_CONTEXT_CHARS)}\n... (context truncated)`;
