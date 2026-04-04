@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
@@ -25,14 +25,26 @@ import { registerTaskCommand } from './commands/task.js';
 import { registerTemplateCommand } from './commands/template.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
+
+function readVersion(): string {
+  // Try multiple relative paths to support both source (src/cli/) and compiled (dist/cli/) layouts
+  for (const rel of ['../../package.json', '../../../package.json']) {
+    const candidate = resolve(__dirname, rel);
+    if (existsSync(candidate)) {
+      const pkg = JSON.parse(readFileSync(candidate, 'utf-8'));
+      if (typeof pkg.version === 'string') return pkg.version;
+    }
+  }
+  return '0.0.0';
+}
+const version = readVersion();
 
 const program = new Command();
 
 program
   .name('planr')
   .description('AI-powered planning CLI — backlog, sprints, tasks, estimation, and AI agent rules')
-  .version(pkg.version as string)
+  .version(version)
   .option('--project-dir <path>', 'project root directory', process.cwd())
   .option('--verbose', 'verbose output', false)
   .option('--no-interactive', 'skip interactive prompts');
