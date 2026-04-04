@@ -84,7 +84,10 @@ export const logger = {
   },
   debug(msg: string, ...args: unknown[]) {
     if (verboseEnabled) {
-      const extra = args.length > 0 ? ` ${args.map(String).join(' ')}` : '';
+      const extra =
+        args.length > 0
+          ? ` ${args.map((a) => (a instanceof Error ? (a.stack ?? a.message) : String(a))).join(' ')}`
+          : '';
       out(chalk.gray(`[DEBUG] ${msg}${extra}`));
     }
   },
@@ -149,15 +152,17 @@ export const display = {
   progressBar(percent: number, width = 20, opts: { label?: string; indent?: number } = {}) {
     const { label = '', indent = 2 } = opts;
     const pad = ' '.repeat(indent);
-    const filled = Math.round((percent / 100) * width);
-    const empty = width - filled;
+    const clamped = Math.max(0, Math.min(100, percent));
+    const safeWidth = Math.max(1, width);
+    const filled = Math.round((clamped / 100) * safeWidth);
+    const empty = safeWidth - filled;
     const bar = `${chalk.green('█'.repeat(filled))}${chalk.dim('░'.repeat(empty))}`;
     const pctStr =
-      percent >= 75
-        ? chalk.green(`${percent}%`)
-        : percent >= 25
-          ? chalk.yellow(`${percent}%`)
-          : chalk.red(`${percent}%`);
+      clamped >= 75
+        ? chalk.green(`${clamped}%`)
+        : clamped >= 25
+          ? chalk.yellow(`${clamped}%`)
+          : chalk.red(`${clamped}%`);
     out(`${pad}${bar} ${pctStr}${label ? `  ${label}` : ''}`);
   },
 };

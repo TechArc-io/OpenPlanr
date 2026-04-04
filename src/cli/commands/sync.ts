@@ -111,7 +111,8 @@ async function syncParentChildLinks(
         if (!storiesByFeature.has(featureId)) {
           storiesByFeature.set(featureId, []);
         }
-        storiesByFeature.get(featureId)?.push(parent.id);
+        const arr = storiesByFeature.get(featureId);
+        if (arr) arr.push(parent.id);
       }
     }
   }
@@ -129,7 +130,8 @@ async function syncParentChildLinks(
       if (!actualChildrenByParent.has(parentId)) {
         actualChildrenByParent.set(parentId, new Set());
       }
-      actualChildrenByParent.get(parentId)?.add(child.id);
+      const set = actualChildrenByParent.get(parentId);
+      if (set) set.add(child.id);
     }
 
     // Handle feature-level tasks: task has featureId but no storyId
