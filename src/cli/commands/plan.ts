@@ -42,6 +42,7 @@ import { promptConfirm, promptText } from '../../services/prompt-service.js';
 import { renderTemplate } from '../../services/template-service.js';
 import { writeFile } from '../../utils/fs.js';
 import { display, logger } from '../../utils/logger.js';
+import { buildTaskItems } from '../helpers/task-creation.js';
 
 export function registerPlanCommand(program: Command) {
   program
@@ -286,8 +287,14 @@ async function planFromFeature(
   }
 
   // Step 4: Generate one task list per feature (all stories + full context)
-  await generateTasksForFeature(projectDir, config, provider, featureId, storyIds);
-  return { stories: storyIds.length, tasks: 1 };
+  const taskCreated = await generateTasksForFeature(
+    projectDir,
+    config,
+    provider,
+    featureId,
+    storyIds,
+  );
+  return { stories: storyIds.length, tasks: taskCreated ? 1 : 0 };
 }
 
 async function generateTasksForFeature(
@@ -296,7 +303,7 @@ async function generateTasksForFeature(
   provider: AIProvider,
   featureId: string,
   storyIds: string[],
-) {
+): Promise<boolean> {
   const { gatherFeatureArtifacts } = await import('../../services/artifact-gathering.js');
   const { buildTasksPrompt } = await import('../../ai/prompts/prompt-builder.js');
   const { aiTasksResponseSchema } = await import('../../ai/schemas/ai-response-schemas.js');
@@ -307,7 +314,7 @@ async function generateTasksForFeature(
   } catch (err) {
     logger.debug('Failed to gather feature artifacts', err);
     logger.error(`Feature ${featureId} not found.`);
-    return;
+    return false;
   }
 
   logger.dim(`\n[4/4] Generating tasks for ${featureId} (${ctx.stories.length} stories)...`);
@@ -317,17 +324,7 @@ async function generateTasksForFeature(
     maxTokens: TOKEN_BUDGETS.taskFeature,
   });
 
-  const tasks = result.tasks.map((tg) => ({
-    id: tg.id,
-    title: tg.title,
-    status: 'pending' as const,
-    subtasks: (tg.subtasks || []).map((st) => ({
-      id: st.id,
-      title: st.title,
-      status: 'pending' as const,
-      subtasks: [],
-    })),
-  }));
+  const tasks = buildTaskItems(result);
 
   const featureFilename = await resolveArtifactFilename(projectDir, config, 'feature', featureId);
 
@@ -369,6 +366,7 @@ async function generateTasksForFeature(
   logger.success(
     `Created ${id}: ${result.title} (${total} tasks from ${ctx.stories.length} stories)`,
   );
+  return true;
 }
 
 async function generateTasksForSingleStory(
@@ -402,17 +400,7 @@ async function generateTasksForSingleStory(
       maxTokens: TOKEN_BUDGETS.plan,
     });
 
-    const tasks = result.tasks.map((tg) => ({
-      id: tg.id,
-      title: tg.title,
-      status: 'pending' as const,
-      subtasks: (tg.subtasks || []).map((st) => ({
-        id: st.id,
-        title: st.title,
-        status: 'pending' as const,
-        subtasks: [],
-      })),
-    }));
+    const tasks = buildTaskItems(result);
 
     const storyFilename = await resolveArtifactFilename(projectDir, config, 'story', storyId);
     const artifactSources: Array<{ type: string; path: string }> = [];

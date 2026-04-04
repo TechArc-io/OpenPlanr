@@ -121,7 +121,7 @@ export function registerConfigCommand(program: Command) {
 
   config
     .command('set-agent')
-    .description('Set the default coding agent for task implementation')
+    .description('Set the default coding agent for rules generation')
     .argument('[agent]', 'claude, cursor, or codex')
     .action(async (agent?: string) => {
       const projectDir = program.opts().projectDir as string;

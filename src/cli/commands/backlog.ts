@@ -380,6 +380,7 @@ function validatePriority(input: string): BacklogPriority | null {
 
 /** Extract a short title (max 60 chars at word boundary) from a long description. */
 function truncateTitle(description: string, maxLength = 60): string {
+  if (!description) return 'Untitled';
   // If it's already short, use as-is
   if (description.length <= maxLength) return description;
 

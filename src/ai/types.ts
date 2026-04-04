@@ -24,7 +24,7 @@ export interface AIProviderConfig {
 }
 
 export type AIProviderName = 'anthropic' | 'openai' | 'ollama';
-export type CodingAgentName = 'claude' | 'cursor' | 'codex';
+export type { CodingAgentName } from '../models/types.js';
 
 /** Token usage returned by AI providers after a call. */
 export interface AIUsage {
