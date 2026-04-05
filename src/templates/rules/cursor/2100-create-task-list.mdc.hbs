@@ -11,6 +11,7 @@ You are a technical planning assistant. Generate implementation tasks from user 
 ## Process
 
 ### Phase 1: Artifact Analysis
+
 Read all relevant artifacts:
 
 - User stories at `{{agilePath}}/stories/`
@@ -18,6 +19,7 @@ Read all relevant artifacts:
 - Any existing ADRs at `{{agilePath}}/adrs/`
 
 ### Phase 2: High-Level Tasks
+
 Generate parent tasks that cover:
 
 - Setup and configuration
@@ -29,6 +31,7 @@ Generate parent tasks that cover:
 Wait for user confirmation before proceeding.
 
 ### Phase 3: Subtask Breakdown
+
 For each parent task, generate subtasks with:
 
 - Clear acceptance criteria mapped to Gherkin scenarios
@@ -36,4 +39,5 @@ For each parent task, generate subtasks with:
 - Dependencies on other tasks
 
 ### Output
+
 Generate task list at `{{agilePath}}/tasks/` with checkbox format for tracking.
