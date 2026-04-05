@@ -58,11 +58,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TechArc-io/OpenPlanr.git"
+    "url": "git+https://github.com/openplanr/OpenPlanr.git"
   },
-  "homepage": "https://github.com/TechArc-io/OpenPlanr#readme",
+  "homepage": "https://openplanr.dev",
   "bugs": {
-    "url": "https://github.com/TechArc-io/OpenPlanr/issues"
+    "url": "https://github.com/openplanr/OpenPlanr/issues"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",
