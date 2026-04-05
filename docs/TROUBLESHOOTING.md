@@ -179,7 +179,7 @@ npm test
 
 ## Still stuck?
 
-Open an issue at [github.com/TechArc-io/OpenPlanr/issues](https://github.com/TechArc-io/OpenPlanr/issues) with:
+Open an issue at [github.com/openplanr/OpenPlanr/issues](https://github.com/openplanr/OpenPlanr/issues) with:
 - The command you ran
 - The full error output
 - Your Node.js version (`node --version`)

@@ -13,7 +13,7 @@ Thank you for your interest in contributing to Planr! This guide will help you g
 
 ```bash
 # Fork and clone the repo
-git clone https://github.com/TechArc-io/OpenPlanr.git
+git clone https://github.com/openplanr/OpenPlanr.git
 cd openplanr
 
 # Install dependencies

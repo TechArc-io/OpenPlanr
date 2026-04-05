@@ -1,8 +1,10 @@
-# Planr
+# OpenPlanr
 
 [![npm version](https://img.shields.io/npm/v/openplanr.svg)](https://www.npmjs.com/package/openplanr)
-[![license](https://img.shields.io/npm/l/openplanr.svg)](https://github.com/TechArc-io/OpenPlanr/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/openplanr.svg)](https://github.com/openplanr/OpenPlanr/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/openplanr.svg)](https://nodejs.org)
+
+**Website:** [openplanr.dev](https://openplanr.dev)
 
 **AI-powered planning CLI for developers.** Capture ideas, plan sprints, generate tasks, estimate effort, and sync with GitHub — all from your terminal.
 
@@ -244,7 +246,7 @@ planr template use rest-endpoint --title "User Profile API"
 
 ```bash
 # Clone and install
-git clone https://github.com/TechArc-io/OpenPlanr.git
+git clone https://github.com/openplanr/OpenPlanr.git
 cd openplanr
 npm install
 
