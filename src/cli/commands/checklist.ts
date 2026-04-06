@@ -46,9 +46,9 @@ export function registerChecklistCommand(program: Command) {
     });
 
   checklist
-    .command('toggle')
-    .description('Interactively toggle checklist items')
-    .action(async () => {
+    .command('toggle [items...]')
+    .description('Toggle checklist items (e.g., `planr checklist toggle 1 3 5` or interactive)')
+    .action(async (itemArgs: string[]) => {
       const projectDir = program.opts().projectDir as string;
       const config = await loadConfig(projectDir);
 
@@ -70,25 +70,36 @@ export function registerChecklistCommand(program: Command) {
         return;
       }
 
-      const choices = items.map((item) => ({
-        name: `${item.index}. ${item.activity}`,
-        value: String(item.index),
-        checked: item.done,
-      }));
+      let toToggle: Set<number>;
 
-      const selected = await promptCheckbox(
-        'Toggle checklist items (space to toggle, enter to confirm):',
-        choices,
-      );
-      const selectedSet = new Set(selected.map(Number));
+      if (itemArgs.length > 0) {
+        // Direct toggle: planr checklist toggle 1 3 5
+        toToggle = new Set(itemArgs.map(Number).filter((n) => !Number.isNaN(n)));
+        if (toToggle.size === 0) {
+          logger.error('Invalid item numbers. Use: planr checklist toggle 1 3 5');
+          return;
+        }
+      } else {
+        // Interactive mode
+        const choices = items.map((item) => ({
+          name: `${item.index}. ${item.activity}`,
+          value: String(item.index),
+          checked: item.done,
+        }));
 
-      // Find items that changed: were checked but now unchecked, or vice versa
-      const toToggle = new Set<number>();
-      for (const item of items) {
-        const wasChecked = item.done;
-        const nowChecked = selectedSet.has(item.index);
-        if (wasChecked !== nowChecked) {
-          toToggle.add(item.index);
+        const selected = await promptCheckbox(
+          'Toggle checklist items (space to toggle, enter to confirm):',
+          choices,
+        );
+        const selectedSet = new Set(selected.map(Number));
+
+        toToggle = new Set<number>();
+        for (const item of items) {
+          const wasChecked = item.done;
+          const nowChecked = selectedSet.has(item.index);
+          if (wasChecked !== nowChecked) {
+            toToggle.add(item.index);
+          }
         }
       }
 
