@@ -92,3 +92,10 @@ export const ENV_KEY_MAP: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
 } as const;
+
+/** Human-readable display names for AI providers. */
+export const PROVIDER_LABELS: Record<AIProviderName, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  ollama: 'Ollama',
+} as const;

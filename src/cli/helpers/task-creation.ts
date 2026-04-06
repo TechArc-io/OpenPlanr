@@ -188,7 +188,11 @@ export function displayNextSteps(opts: NextStepsOptions): void {
 export async function handleAIError(err: unknown): Promise<void> {
   const { AIError } = await import('../../ai/errors.js');
   if (err instanceof AIError) {
-    logger.error(err.userMessage);
+    if (err.code === 'missing_key') {
+      display.line(err.userMessage);
+    } else {
+      logger.error(err.userMessage);
+    }
   } else if (err instanceof Error) {
     logger.error(err.message);
   } else {
