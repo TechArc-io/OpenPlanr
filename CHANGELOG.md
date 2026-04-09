@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+### Patch Changes
+
+- [#62](https://github.com/openplanr/OpenPlanr/pull/62) [`45836f9`](https://github.com/openplanr/OpenPlanr/commit/45836f99ad88605ba4aac5fab4f318b20badf5b0) Thanks [@AsemDevs](https://github.com/AsemDevs)! - Reduce AI over-engineering in plan generation with scope discipline rules, count guidance per artifact level, and anti-enumeration batching
+
 ## 1.2.1
 
 ### Patch Changes
