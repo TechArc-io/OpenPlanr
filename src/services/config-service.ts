@@ -6,6 +6,7 @@ import { CONFIG_FILENAME } from '../utils/constants.js';
 import { fileExists, readFile, writeFile } from '../utils/fs.js';
 import { logger } from '../utils/logger.js';
 
+/** Error thrown when no OpenPlanr config file exists in the given project directory. */
 export class ConfigNotFoundError extends Error {
   constructor(projectDir: string) {
     super(`No ${CONFIG_FILENAME} found in ${projectDir}.`);
@@ -13,6 +14,7 @@ export class ConfigNotFoundError extends Error {
   }
 }
 
+/** Load and validate the OpenPlanr config file from the given project directory. */
 export async function loadConfig(projectDir: string): Promise<OpenPlanrConfig> {
   const configPath = path.join(projectDir, CONFIG_FILENAME);
   const exists = await fileExists(configPath);
@@ -24,6 +26,7 @@ export async function loadConfig(projectDir: string): Promise<OpenPlanrConfig> {
   return configSchema.parse(parsed);
 }
 
+/** Write the OpenPlanr config to disk as formatted JSON. */
 export async function saveConfig(projectDir: string, config: OpenPlanrConfig): Promise<void> {
   const configPath = path.join(projectDir, CONFIG_FILENAME);
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
@@ -49,6 +52,7 @@ export function findProjectRoot(startDir: string = process.cwd()): string {
   return startDir;
 }
 
+/** Build a default OpenPlanr config with standard prefixes and output paths. */
 export function createDefaultConfig(projectName: string): OpenPlanrConfig {
   return {
     projectName,

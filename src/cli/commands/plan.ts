@@ -43,7 +43,7 @@ import { promptConfirm, promptText } from '../../services/prompt-service.js';
 import { renderTemplate } from '../../services/template-service.js';
 import { writeFile } from '../../utils/fs.js';
 import { display, logger } from '../../utils/logger.js';
-import { buildTaskItems } from '../helpers/task-creation.js';
+import { buildTaskItems, handleAIError } from '../helpers/task-creation.js';
 
 export function registerPlanCommand(program: Command) {
   program
@@ -84,12 +84,7 @@ export function registerPlanCommand(program: Command) {
           await planFromScratch(projectDir, config, provider);
         }
       } catch (err) {
-        const { AIError } = await import('../../ai/errors.js');
-        if (err instanceof AIError) {
-          logger.error(err.userMessage);
-        } else {
-          throw err;
-        }
+        await handleAIError(err);
       }
     });
 }

@@ -2,6 +2,7 @@ import { checkbox, confirm, editor, input, password, select } from '@inquirer/pr
 import { logger } from '../utils/logger.js';
 import { isNonInteractive } from './interactive-state.js';
 
+/** Prompt the user for a single line of text input. Falls back to defaultValue in non-interactive mode. */
 export async function promptText(message: string, defaultValue?: string): Promise<string> {
   if (isNonInteractive()) {
     if (defaultValue !== undefined) {
@@ -13,6 +14,7 @@ export async function promptText(message: string, defaultValue?: string): Promis
   return input({ message, default: defaultValue });
 }
 
+/** Prompt the user to select one option from a list. */
 export async function promptSelect<T extends string>(
   message: string,
   choices: Array<{ name: string; value: T }>,
@@ -26,6 +28,7 @@ export async function promptSelect<T extends string>(
   return select({ message, choices, default: defaultValue });
 }
 
+/** Prompt the user for a yes/no confirmation. */
 export async function promptConfirm(message: string, defaultValue = true): Promise<boolean> {
   if (isNonInteractive()) {
     logger.dim(`  [auto] ${message} → ${defaultValue ? 'yes' : 'no'}`);
@@ -34,6 +37,7 @@ export async function promptConfirm(message: string, defaultValue = true): Promi
   return confirm({ message, default: defaultValue });
 }
 
+/** Open the user's default editor for multi-line text input. */
 export async function promptEditor(message: string, defaultValue?: string): Promise<string> {
   if (isNonInteractive()) {
     if (defaultValue !== undefined) {
@@ -47,6 +51,7 @@ export async function promptEditor(message: string, defaultValue?: string): Prom
   return editor({ message, default: defaultValue });
 }
 
+/** Prompt the user for sensitive input with masked characters. */
 export async function promptSecret(message: string): Promise<string> {
   if (isNonInteractive()) {
     logger.dim('  [auto] Skipping secret prompt (set via environment variable)');
@@ -55,6 +60,7 @@ export async function promptSecret(message: string): Promise<string> {
   return password({ message, mask: '*' });
 }
 
+/** Prompt the user to select multiple options from a checkbox list. */
 export async function promptCheckbox<T extends string>(
   message: string,
   choices: Array<{ name: string; value: T; checked?: boolean }>,
@@ -67,6 +73,7 @@ export async function promptCheckbox<T extends string>(
   return checkbox({ message, choices });
 }
 
+/** Prompt the user for comma-separated text values, returned as a trimmed array. */
 export async function promptMultiText(message: string, hint?: string): Promise<string[]> {
   if (isNonInteractive()) {
     throw new Error(

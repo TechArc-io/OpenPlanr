@@ -19,10 +19,12 @@ const ARTIFACT_DIR_MAP: Record<string, string> = {
   checklist: 'checklists',
 };
 
+/** Return the directory path for a given artifact type relative to the agile output root. */
 export function getArtifactDir(config: OpenPlanrConfig, type: ArtifactType): string {
   return path.join(config.outputPaths.agile, ARTIFACT_DIR_MAP[type] || type);
 }
 
+/** Create a new artifact file from a Handlebars template, assigning the next available ID. */
 export async function createArtifact(
   projectDir: string,
   config: OpenPlanrConfig,
@@ -57,6 +59,7 @@ export async function createArtifact(
   return { id, filePath };
 }
 
+/** List all artifacts of a given type, returning their ID, title, and filename. */
 export async function listArtifacts(
   projectDir: string,
   config: OpenPlanrConfig,
@@ -79,6 +82,7 @@ export async function listArtifacts(
   return results;
 }
 
+/** Read and parse an artifact's frontmatter and markdown body by ID. Returns null if not found. */
 export async function readArtifact(
   projectDir: string,
   config: OpenPlanrConfig,
@@ -143,6 +147,8 @@ export async function resolveArtifactFilename(
   id: string,
 ): Promise<string> {
   const dir = path.join(projectDir, getArtifactDir(config, type));
+  // Match files starting with the ID followed by a slug: "EPIC-001-my-title.md"
+  // The regex anchors to ^ to avoid matching "EPIC-0011-..." when looking for "EPIC-001"
   const files = await listFiles(dir, new RegExp(`^${id}-.*\\.md$`));
   if (files.length > 0) return files[0].replace(/\.md$/, '');
   return id;

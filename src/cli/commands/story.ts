@@ -28,6 +28,7 @@ import { promptConfirm, promptText } from '../../services/prompt-service.js';
 import { renderTemplate } from '../../services/template-service.js';
 import { writeFile } from '../../utils/fs.js';
 import { display, logger } from '../../utils/logger.js';
+import { handleAIError } from '../helpers/task-creation.js';
 
 export function registerStoryCommand(program: Command) {
   const story = program.command('story').description('Manage user stories');
@@ -324,12 +325,7 @@ async function createStoriesWithAI(
 
     return createdIds.length;
   } catch (err) {
-    const { AIError } = await import('../../ai/errors.js');
-    if (err instanceof AIError) {
-      logger.error(err.userMessage);
-    } else {
-      throw err;
-    }
+    await handleAIError(err);
     return 0;
   }
 }

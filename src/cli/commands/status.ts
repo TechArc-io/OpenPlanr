@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 import { parseTaskMarkdown } from '../../agents/task-parser.js';
 import { listArtifacts, readArtifact, readArtifactRaw } from '../../services/artifact-service.js';
 import { loadConfig } from '../../services/config-service.js';
+import { colorByPercent } from '../../utils/format.js';
 import { display, logger } from '../../utils/logger.js';
 import { parseMarkdown } from '../../utils/markdown.js';
 
@@ -266,10 +267,4 @@ function printSection(
       display.line(chalk.dim(`    ... and ${count - 5} more`));
     }
   }
-}
-
-function colorByPercent(text: string, pct: number): string {
-  if (pct >= 75) return chalk.green(text);
-  if (pct >= 25) return chalk.yellow(text);
-  return chalk.red(text);
 }

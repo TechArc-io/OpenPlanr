@@ -1,5 +1,6 @@
 import { listFiles } from '../utils/fs.js';
 
+/** Return the next available sequential ID (e.g. "FEAT-004") for the given prefix in a directory. */
 export async function getNextId(dir: string, prefix: string): Promise<string> {
   const files = await listFiles(dir, new RegExp(`^${prefix}-\\d{3}`));
   const usedNums = new Set<number>();
@@ -18,6 +19,7 @@ export async function getNextId(dir: string, prefix: string): Promise<string> {
   return `${prefix}-${nextNum}`;
 }
 
+/** Parse an artifact ID string (e.g. "FEAT-002") into its prefix and numeric parts. */
 export function parseId(id: string): { prefix: string; num: number } | null {
   const match = id.match(/^([A-Z]+)-(\d{3})$/);
   if (!match) return null;
