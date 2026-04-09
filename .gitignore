@@ -32,8 +32,9 @@ Thumbs.db
 *.swo
 *~
 
-# Optional: local tool settings (machine-specific)
-.claude/settings.local.json
+.planr/
+.claude/
+.cursor/
 
 # Debug / misc
 .cache/
