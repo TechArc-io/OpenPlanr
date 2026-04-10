@@ -24,6 +24,7 @@ import { loadConfig } from '../../services/config-service.js';
 import { requireInteractiveForManual } from '../../services/interactive-state.js';
 import { promptConfirm, promptMultiText, promptText } from '../../services/prompt-service.js';
 import { display, logger } from '../../utils/logger.js';
+import { handleAIError } from '../helpers/task-creation.js';
 
 export function registerFeatureCommand(program: Command) {
   const feature = program.command('feature').description('Manage features');
@@ -187,12 +188,7 @@ async function createFeaturesWithAI(
     logger.dim(`  Or generate stories for all features at once:`);
     logger.dim(`  planr plan --epic ${epicId}                   — Auto-generate stories → tasks`);
   } catch (err) {
-    const { AIError } = await import('../../ai/errors.js');
-    if (err instanceof AIError) {
-      logger.error(err.userMessage);
-    } else {
-      throw err;
-    }
+    await handleAIError(err);
   }
 }
 

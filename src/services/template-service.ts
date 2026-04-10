@@ -23,6 +23,7 @@ Handlebars.registerHelper('join', (arr: string[], sep: unknown) =>
 
 Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
 
+/** Compile and render a Handlebars template, checking the override directory first. */
 export async function renderTemplate(
   templatePath: string,
   data: Record<string, unknown>, // Template data is inherently untyped

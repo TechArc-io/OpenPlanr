@@ -20,6 +20,13 @@ import { createSpinner, formatUsage } from '../utils/logger.js';
 import { resolveApiKey } from './credentials-service.js';
 
 /**
+ * Default AI temperature for structured JSON generation.
+ * 0.5 balances creativity with consistency — low enough for reliable JSON,
+ * high enough for varied feature/story/task descriptions.
+ */
+const DEFAULT_TEMPERATURE = 0.5;
+
+/**
  * Initialize an AI provider from project config.
  * Dynamically imports the factory to keep non-AI commands fast.
  */
@@ -177,7 +184,7 @@ export async function generateJSON<T>(
   options?: AIRequestOptions,
 ): Promise<AIGenerateResult<T>> {
   const requestOptions: AIRequestOptions = {
-    temperature: 0.5,
+    temperature: DEFAULT_TEMPERATURE,
     ...options,
     jsonMode: true,
   };
@@ -198,7 +205,7 @@ export async function generateStreamingJSON<T>(
   options?: AIRequestOptions,
 ): Promise<AIGenerateResult<T>> {
   const requestOptions: AIRequestOptions = {
-    temperature: 0.5,
+    temperature: DEFAULT_TEMPERATURE,
     ...options,
     jsonMode: true,
   };

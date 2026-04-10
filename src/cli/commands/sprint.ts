@@ -22,6 +22,7 @@ import {
 } from '../../services/artifact-service.js';
 import { loadConfig } from '../../services/config-service.js';
 import { promptConfirm, promptEditor, promptText } from '../../services/prompt-service.js';
+import { colorByPercent } from '../../utils/format.js';
 import { display, logger } from '../../utils/logger.js';
 import { parseMarkdown } from '../../utils/markdown.js';
 
@@ -480,8 +481,10 @@ async function autoSelectTasks(
   const allSprints = await loadSprints(projectDir, config);
   const assignedIds = new Set(allSprints.flatMap((s) => s.taskIds));
 
-  const tasks = await listArtifacts(projectDir, config, 'task');
-  const quickTasks = await listArtifacts(projectDir, config, 'quick');
+  const [tasks, quickTasks] = await Promise.all([
+    listArtifacts(projectDir, config, 'task'),
+    listArtifacts(projectDir, config, 'quick'),
+  ]);
   const allTasks = [
     ...tasks.map((t) => ({ ...t, type: 'task' as const })),
     ...quickTasks.map((t) => ({ ...t, type: 'quick' as const })),
@@ -596,11 +599,17 @@ async function autoSelectTasks(
   }
 }
 
+/**
+ * Calculate average velocity from closed sprints.
+ *
+ * Algorithm: sum(taskCount) / count(closedSprints), rounded.
+ * Uses task count as proxy since not all tasks have story points assigned.
+ * Returns 20 as default for the first sprint (no historical data).
+ */
 function calculateAverageVelocity(sprints: SprintSummary[]): number {
   const closed = sprints.filter((s) => s.status === 'closed');
-  if (closed.length === 0) return 20; // Default velocity for first sprint
+  if (closed.length === 0) return 20;
 
-  // Use task count as proxy for velocity (since not all tasks have story points)
   const total = closed.reduce((sum, s) => sum + s.taskCount, 0);
   return Math.round(total / closed.length);
 }
@@ -634,10 +643,4 @@ function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
-}
-
-function colorByPercent(text: string, pct: number): string {
-  if (pct >= 75) return chalk.green(text);
-  if (pct >= 25) return chalk.yellow(text);
-  return chalk.red(text);
 }

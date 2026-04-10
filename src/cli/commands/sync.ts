@@ -91,8 +91,10 @@ async function syncParentChildLinks(
   config: OpenPlanrConfig,
   opts: SyncOptions,
 ): Promise<number> {
-  const parents = await listArtifacts(projectDir, config, opts.parentType);
-  const children = await listArtifacts(projectDir, config, opts.childType);
+  const [parents, children] = await Promise.all([
+    listArtifacts(projectDir, config, opts.parentType),
+    listArtifacts(projectDir, config, opts.childType),
+  ]);
   let fixes = 0;
 
   // Build map: parentId → set of actual child IDs that reference this parent
