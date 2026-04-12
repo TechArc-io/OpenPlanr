@@ -132,7 +132,7 @@ export function registerTaskCommand(program: Command) {
       }
 
       const allowed = VALID_STATUSES.task;
-      if (!allowed.includes(opts.status)) {
+      if (allowed && !allowed.includes(opts.status)) {
         logger.error(`Invalid status "${opts.status}". Valid: ${allowed.join(', ')}`);
         process.exit(1);
       }

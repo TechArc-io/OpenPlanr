@@ -337,7 +337,7 @@ export function registerBacklogCommand(program: Command) {
 
       if (opts.status) {
         const allowed = VALID_STATUSES.backlog;
-        if (!allowed.includes(opts.status)) {
+        if (allowed && !allowed.includes(opts.status)) {
           logger.error(`Invalid status "${opts.status}". Valid: ${allowed.join(', ')}`);
           process.exit(1);
         }

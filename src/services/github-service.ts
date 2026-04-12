@@ -549,18 +549,20 @@ export function getIssueTypeForArtifact(type: ArtifactType): string | null {
 // GitHub Issue Types (GraphQL)
 // ---------------------------------------------------------------------------
 
-/** Cached repo issue types for the current session. */
-let issueTypeCache: Record<string, string> | null = null;
+/** Cached repo issue types keyed by "owner/repo". */
+const issueTypeCache = new Map<string, Record<string, string>>();
 
 /**
- * Fetch available issue types for the current repo and cache them.
+ * Fetch available issue types for a repo and cache them.
  * Returns a map of issue type name → node ID.
  */
 export async function fetchIssueTypes(
   owner: string,
   repo: string,
 ): Promise<Record<string, string>> {
-  if (issueTypeCache) return issueTypeCache;
+  const cacheKey = `${owner}/${repo}`;
+  const cached = issueTypeCache.get(cacheKey);
+  if (cached) return cached;
 
   try {
     const query = `query { repository(owner: "${owner}", name: "${repo}") { issueTypes(first: 20) { nodes { id name } } } }`;
@@ -568,18 +570,20 @@ export async function fetchIssueTypes(
     const parsed = JSON.parse(result);
     const nodes = parsed?.data?.repository?.issueTypes?.nodes;
     if (Array.isArray(nodes)) {
-      issueTypeCache = {};
+      const types: Record<string, string> = {};
       for (const node of nodes) {
-        issueTypeCache[node.name] = node.id;
+        types[node.name] = node.id;
       }
-      return issueTypeCache;
+      issueTypeCache.set(cacheKey, types);
+      return types;
     }
   } catch (err) {
     logger.debug('Failed to fetch GitHub issue types', err);
   }
 
-  issueTypeCache = {};
-  return issueTypeCache;
+  const empty: Record<string, string> = {};
+  issueTypeCache.set(cacheKey, empty);
+  return empty;
 }
 
 /**

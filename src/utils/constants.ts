@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ArtifactType } from '../models/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ export const ID_PREFIXES = {
   adr: 'ADR',
 } as const;
 
-export const VALID_STATUSES: Record<string, string[]> = {
+export const VALID_STATUSES: Partial<Record<ArtifactType, readonly string[]>> = {
   epic: ['planning', 'in-progress', 'done'],
   feature: ['planning', 'in-progress', 'done'],
   story: ['planning', 'in-progress', 'done'],

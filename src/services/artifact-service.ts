@@ -136,8 +136,19 @@ export async function updateArtifact(
 }
 
 /**
+ * Escape a value for safe YAML frontmatter output.
+ * Wraps in double quotes and escapes embedded double-quotes and backslashes.
+ */
+function yamlEscape(value: unknown): string {
+  const str = String(value);
+  const escaped = str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `"${escaped}"`;
+}
+
+/**
  * Update specific frontmatter fields on an artifact.
- * Uses regex replacement to preserve original file formatting (quote style, key order).
+ * Operates only within the YAML frontmatter region (between --- delimiters).
+ * Inserts missing fields before the closing --- if they don't exist.
  * Automatically sets the `updated` field to today's date.
  */
 export async function updateArtifactFields(
@@ -153,14 +164,30 @@ export async function updateArtifactFields(
   const today = new Date().toISOString().split('T')[0];
   const allFields = { ...fields, updated: today };
 
-  let updated = raw;
+  // Split into frontmatter and body to avoid modifying markdown content
+  const openIdx = raw.indexOf('---');
+  const closeIdx = raw.indexOf('\n---', openIdx + 3);
+  if (openIdx === -1 || closeIdx === -1) {
+    throw new Error(`Artifact ${id} has no valid frontmatter.`);
+  }
+
+  let frontmatter = raw.slice(openIdx, closeIdx);
+  const body = raw.slice(closeIdx);
+
   for (const [key, value] of Object.entries(allFields)) {
-    const pattern = new RegExp(`^${key}:\\s*.*$`, 'm');
-    if (pattern.test(updated)) {
-      updated = updated.replace(pattern, `${key}: "${value}"`);
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedKey}:\\s*.*$`, 'm');
+    const replacement = `${key}: ${yamlEscape(value)}`;
+
+    if (pattern.test(frontmatter)) {
+      frontmatter = frontmatter.replace(pattern, replacement);
+    } else {
+      // Insert missing field before the closing ---
+      frontmatter += `\n${replacement}`;
     }
   }
 
+  const updated = frontmatter + body;
   await updateArtifact(projectDir, config, type, id, updated);
 }
 
