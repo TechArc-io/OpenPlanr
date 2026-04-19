@@ -939,11 +939,11 @@ planr report sprint --push github                     # archive as a planr:repor
 | `--output <dir>`      | Write outputs under this directory (relative to project)                                 | `.planr/reports`   |
 | `--stdout`            | Print markdown to stdout instead of writing a file                                       | `false`            |
 | `--lint`              | Run the report quality linter on the generated markdown                                  | `false`            |
-| `--strict-evidence`   | Fail if bullets under `##` headings are missing URLs or `#NNN` refs                      | `false`            |
+| `--strict-evidence`   | Fail if substantive bullets under `##` (except **Evidence**) lack URLs or `#NNN` refs; skips full-line `_placeholder_` bullets | `false`            |
 | `--push <targets>`    | Comma-separated channels: `github`, `slack`                                              | None               |
 | `--dry-run`           | With `--push`, show actions without sending (Slack dry-run works without a webhook)      | `false`            |
 
-**Output files:** `.planr/reports/<type>-<YYYY-MM-DD-HHMM>.md` (and `.html` when `--format html`).
+**Output files:** `.planr/reports/<YYYY-MM-DD>-<reportType>-report.md` (and `.html` when `--format html`, same basename). Example: `2026-04-19-weekly-report.md`.
 
 **Configuration (`.planr/config.json`):**
 
@@ -951,13 +951,13 @@ planr report sprint --push github                     # archive as a planr:repor
 {
   "reports": {
     "orgName": "Acme",
-    "primaryColor": "#0a84ff",
+    "accentColor": "#0a84ff",
     "logoUrl": "https://example.com/logo.png",
-    "templateOverrides": "./reports-overrides",
-    "extraSections": [
-      { "title": "Compliance", "body": "SOC2 controls verified weekly." }
-    ]
+    "customSections": {
+      "Compliance": "SOC2 controls verified weekly."
+    }
   },
+  "templateOverrides": "./reports-overrides",
   "distribution": {
     "slackWebhookUrl": "https://hooks.slack.com/services/...",
     "slackChannel": "#eng-updates"
@@ -965,7 +965,7 @@ planr report sprint --push github                     # archive as a planr:repor
 }
 ```
 
-All blocks are optional; the command works against a freshly initialized project.
+`slackChannel` is reserved for future use; Incoming Webhooks target the channel encoded in the webhook URL. All blocks are optional; the command works against a freshly initialized project.
 
 ---
 

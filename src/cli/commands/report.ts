@@ -106,7 +106,7 @@ export function registerReportCommand(program: Command) {
         }
 
         if (opts.strictEvidence) {
-          const claims = validateClaimsHaveAnchors(markdown, 1);
+          const claims = validateClaimsHaveAnchors(markdown, 1, { reportType });
           const bad = claims.filter((c) => !c.ok);
           if (bad.length > 0) {
             for (const c of bad) {

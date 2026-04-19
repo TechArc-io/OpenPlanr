@@ -181,7 +181,7 @@ Generate evidence-linked status reports from your `.planr/` artifacts and (optio
 
 **Distribution:** `--push slack` posts via an [Incoming Webhook](https://api.slack.com/messaging/webhooks) configured at `distribution.slackWebhookUrl` in `.planr/config.json`. `--push github` opens a `planr:report` issue using the local `gh` CLI.
 
-**Quality gates:** `--strict-evidence` fails when bullets under `##` headings are missing URLs or `#issue` refs; `--lint` runs configurable rules (extend or override via `reportLinter` in `.planr/config.json`).
+**Quality gates:** `--strict-evidence` fails when substantive bullets under `##` sections (except the **Evidence** appendix) are missing URLs or `#issue` refs; full-line italic placeholders like `_Add links…_` are skipped. `--lint` runs configurable rules (extend or override via `reportLinter` in `.planr/config.json`).
 
 ### Setup & config commands
 

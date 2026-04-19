@@ -6,6 +6,7 @@ import type {
   ClaimValidationResult,
   EvidenceSummary,
   ReportEvidenceItem,
+  StakeholderReportType,
 } from '../models/types.js';
 import { validateRepoAccessible } from './github-service.js';
 
@@ -18,10 +19,29 @@ export function countEvidenceAnchors(markdown: string): number {
   return urls.length + issues.length;
 }
 
+export interface ValidateClaimsOptions {
+  /** Included for forward-compatible per-report tuning; reserved for future use. */
+  reportType?: StakeholderReportType;
+}
+
+function shouldSkipStrictEvidenceSection(heading: string): boolean {
+  return /^\s*evidence\b/i.test(heading);
+}
+
+/** Template placeholder bullets (italic instructions) are not treated as factual claims. */
+function isPlaceholderClaimBullet(line: string): boolean {
+  const m = line.match(/^\s*[-*]\s+(.+)$/);
+  if (!m) return false;
+  const t = m[1].trim();
+  return /^_.+_$/s.test(t);
+}
+
 export function validateClaimsHaveAnchors(
   markdown: string,
   minAnchors: number,
+  options?: ValidateClaimsOptions,
 ): ClaimValidationResult[] {
+  void options?.reportType;
   const sections = markdown.split(/^## /m).slice(1);
   const results: ClaimValidationResult[] = [];
   let idx = 0;
@@ -29,10 +49,16 @@ export function validateClaimsHaveAnchors(
     idx += 1;
     const lines = chunk.split('\n');
     const heading = lines[0]?.trim() ?? `section-${idx}`;
+    if (shouldSkipStrictEvidenceSection(heading)) {
+      continue;
+    }
     const body = lines.slice(1).join('\n');
     const bullets = body.split('\n').filter((l) => /^\s*[-*]\s+/.test(l));
     for (let j = 0; j < bullets.length; j += 1) {
       const line = bullets[j];
+      if (isPlaceholderClaimBullet(line)) {
+        continue;
+      }
       const n = countEvidenceAnchors(line);
       const claimId = `${heading}:${j}`;
       if (n < minAnchors) {

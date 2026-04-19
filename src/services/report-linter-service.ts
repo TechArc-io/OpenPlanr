@@ -35,8 +35,8 @@ const DEFAULT_RULES: ReportLinterConfig['rules'] = [
 
 export function mergeLinterConfig(config?: ReportLinterConfig): ReportLinterConfig {
   return {
-    rules: config?.rules?.length ? config.rules : DEFAULT_RULES,
-    vaguePhrases: config?.vaguePhrases?.length ? config.vaguePhrases : DEFAULT_VAGUE,
+    rules: config?.rules ?? DEFAULT_RULES,
+    vaguePhrases: config?.vaguePhrases ?? DEFAULT_VAGUE,
   };
 }
 

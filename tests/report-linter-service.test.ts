@@ -21,4 +21,13 @@ describe('report-linter-service', () => {
     });
     expect(res.findings.filter((f) => f.ruleId === 'weekly-structure')).toHaveLength(0);
   });
+
+  it('respects empty rules and vaguePhrases arrays (disables defaults)', () => {
+    const res = validateReportMarkdown('We almost done with things.', 'weekly', {
+      rules: [],
+      vaguePhrases: [],
+    });
+    expect(res.findings).toHaveLength(0);
+    expect(res.coaching).toHaveLength(0);
+  });
 });

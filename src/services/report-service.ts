@@ -81,6 +81,29 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove the first Markdown H1 line (and following blank lines) so HTML export does not
+ * duplicate the document title: wrapHtmlDocument() already injects a single <h1>.
+ */
+export function stripLeadingMarkdownH1(md: string): string {
+  const lines = md.split(/\r?\n/);
+  if (lines.length === 0) return md;
+  const first = lines[0]?.trim() ?? '';
+  if (!/^#\s+.+$/.test(first)) return md;
+  let i = 1;
+  while (i < lines.length && lines[i]?.trim() === '') i += 1;
+  return lines.slice(i).join('\n');
+}
+
 /** Minimal markdown → HTML for reports (headings, lists, links, paragraphs). */
 export function markdownToBasicHtml(md: string): string {
   const lines = md.split(/\r?\n/);
@@ -128,7 +151,13 @@ export function markdownToBasicHtml(md: string): string {
 function inlineMd(text: string): string {
   let s = escapeHtml(text);
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, urlEsc: string) => {
+    const url = urlEsc.replace(/&amp;/g, '&');
+    if (isSafeHttpUrl(url)) {
+      return `<a href="${escapeHtml(url)}" rel="noopener noreferrer">${label}</a>`;
+    }
+    return `${label} (${urlEsc})`;
+  });
   return s;
 }
 
@@ -139,7 +168,7 @@ export async function formatStakeholderReportOutput(
 ): Promise<{ markdown: string; html?: string }> {
   const markdown = await generateStakeholderReportMarkdown(context, config);
   if (format === 'html') {
-    const inner = markdownToBasicHtml(markdown);
+    const inner = markdownToBasicHtml(stripLeadingMarkdownH1(markdown));
     const title = `${context.projectName} — ${context.reportType} report`;
     const html = wrapHtmlDocument(title, inner, context.branding?.accentColor);
     return { markdown, html };

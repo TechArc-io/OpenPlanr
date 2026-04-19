@@ -47,9 +47,11 @@ export interface OpenPlanrConfig {
   /** Optional delivery channel settings */
   distribution?: {
     slackWebhookUrl?: string;
+    /** Reserved: Incoming Webhooks encode the channel in the URL; not read by v1 `push slack`. */
     slackChannel?: string;
     emailFrom?: string;
     emailSmtpHost?: string;
+    /** Reserved for future SMTP allowlists; not read while email delivery is stubbed. */
     weeklyRecipientAllowlist?: string[];
   };
   reportLinter?: ReportLinterConfig;
