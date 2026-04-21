@@ -343,3 +343,157 @@ export interface VoiceStandupSession {
   transcript: string;
   errorMessage?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Plan revision (EPIC-003)
+//
+// Types for `planr revise` — the agentic revision command that aligns
+// planning artifacts with codebase reality. See
+// .planr/EPIC-REVISE-COMMAND.md for the design brief and
+// .planr/epics/EPIC-003-plan-revision-layer-revise-command.md for scope.
+// ---------------------------------------------------------------------------
+
+export type ReviseAction = 'revise' | 'skip' | 'flag';
+
+/**
+ * Typed evidence kinds the agent must use when citing why a revision or
+ * flag is justified. Every kind is verifiable by the post-flight guard:
+ * - `file_exists` / `file_absent` — fs.stat check against `ref`
+ * - `grep_match` — substring match in the provided codebase context
+ * - `sibling_artifact` — quote from another artifact within the same scope
+ * - `source_quote` — quote from a declared source (PRD, design, ADR, rule file)
+ * - `pattern_rule` — an architectural pattern rule detected by existing pattern-rules
+ */
+export type ReviseEvidenceType =
+  | 'file_exists'
+  | 'file_absent'
+  | 'grep_match'
+  | 'sibling_artifact'
+  | 'source_quote'
+  | 'pattern_rule';
+
+export interface ReviseEvidence {
+  type: ReviseEvidenceType;
+  /** What the evidence points at — a file path, artifact id, or rule id. */
+  ref: string;
+  /** Verbatim snippet supporting the evidence (when applicable to the type). */
+  quote?: string;
+}
+
+export interface ReviseAmbiguity {
+  /** Section of the target artifact the ambiguity touches. */
+  section: string;
+  /** Why the agent could not resolve this without a human decision. */
+  reason: string;
+}
+
+/**
+ * One agent decision for one artifact. Produced by the revise agent,
+ * validated by `aiReviseDecisionSchema`, verified by the post-flight guard.
+ *
+ * Invariants (enforced by the zod schema, not the TS type):
+ * - `action === 'revise'` requires non-empty `revisedMarkdown` and at least one `evidence` entry
+ * - `action === 'flag'` requires at least one `ambiguous` entry
+ * - `action === 'skip'` has no `revisedMarkdown` and no `ambiguous` entries
+ */
+export interface ReviseDecision {
+  artifactId: string;
+  action: ReviseAction;
+  /** Proposed full artifact markdown; required when action === 'revise'. */
+  revisedMarkdown?: string;
+  rationale: string;
+  /** Typed evidence citations — post-flight verifies these. Always present, empty when none. */
+  evidence: ReviseEvidence[];
+  /** Ambiguities requiring human decision — populated when action === 'flag', empty otherwise. */
+  ambiguous: ReviseAmbiguity[];
+}
+
+/** Audit log output format. */
+export type ReviseAuditFormat = 'md' | 'json';
+
+/**
+ * Terminal state recorded in the audit log for a single artifact in a
+ * revise run. Superset of the agent's `ReviseAction` so we can also record
+ * human overrides (skipped / quit) and system outcomes (failed / demoted).
+ */
+export type ReviseAuditOutcome =
+  | 'applied'
+  | 'would-apply' // dry-run equivalent of 'applied'
+  | 'skipped-by-agent'
+  | 'skipped-by-user'
+  | 'flagged'
+  | 'failed'
+  | 'demoted'; // evidence verifier flipped revise → flag
+
+/**
+ * One row in the revise audit log. Flushed to disk as soon as it is
+ * produced (FEAT-012 §4.1) so an interrupted run still leaves an accurate
+ * on-disk record of what was written.
+ */
+export interface ReviseAuditEntry {
+  artifactId: string;
+  artifactPath?: string;
+  outcome: ReviseAuditOutcome;
+  rationale: string;
+  evidence: ReviseEvidence[];
+  ambiguous: ReviseAmbiguity[];
+  /** Cascade level the entry was produced at; omitted for single-artifact runs. */
+  cascadeLevel?: 'epic' | 'features' | 'stories' | 'tasks';
+  /** Unified diff against the pre-revise artifact body; present when outcome wrote content. */
+  diff?: string;
+  /** Present when outcome === 'failed'. */
+  error?: string;
+  timestamp: string;
+}
+
+/** Aggregate audit record covering a single revise run. */
+export interface ReviseAudit {
+  scope: string;
+  cascade: boolean;
+  dryRun: boolean;
+  startedAt: string;
+  completedAt?: string;
+  entries: ReviseAuditEntry[];
+  /** Populated when the run stopped before normal completion. */
+  interrupted?: {
+    reason: 'q' | 'sigint' | 'agent_error' | 'graph_rollback';
+    atArtifactId?: string;
+  };
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}
+
+/**
+ * One level in a top-down cascade. Tracks which artifact type the level
+ * covers and the ordered artifact ids processed at that level.
+ */
+export interface CascadeLevel {
+  type: ArtifactType;
+  label: 'epic' | 'features' | 'stories' | 'tasks';
+  artifactIds: string[];
+}
+
+/**
+ * Plan for a cascade run. Built by `buildCascadeOrder` and consumed by the
+ * cascade executor; immutable after construction.
+ */
+export interface CascadePlan {
+  /** Root artifact that started the cascade (epic / feature / story / task). */
+  rootId: string;
+  rootType: ArtifactType;
+  levels: CascadeLevel[];
+  /** Convenience: flat list of all artifact ids in cascade order. */
+  orderedIds: string[];
+}
+
+/** Live progress snapshot emitted during cascade execution. */
+export interface CascadeProgress {
+  completed: number;
+  total: number;
+  currentArtifactId: string;
+  currentLevelLabel: CascadeLevel['label'];
+  /** Rolling estimate of remaining time in seconds; null until enough samples collected. */
+  etaSeconds: number | null;
+}

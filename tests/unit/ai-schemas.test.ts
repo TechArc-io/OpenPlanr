@@ -3,6 +3,7 @@ import {
   aiEpicResponseSchema,
   aiFeaturesResponseSchema,
   aiRefineResponseSchema,
+  aiReviseDecisionSchema,
   aiStoriesResponseSchema,
   aiTasksResponseSchema,
 } from '../../src/ai/schemas/ai-response-schemas.js';
@@ -163,5 +164,193 @@ describe('aiRefineResponseSchema', () => {
       improvedMarkdown: '',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('aiReviseDecisionSchema', () => {
+  // Gherkin scenarios from US-032 -------------------------------------------
+
+  it('accepts a revise decision with revisedMarkdown and evidence (US-032 scenario 1)', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      revisedMarkdown: '---\nid: "TASK-007"\n---\n# Updated body',
+      rationale: 'Linter config path does not exist; align to report-linter-service.ts.',
+      evidence: [
+        { type: 'file_absent', ref: 'src/templates/linter/linter-config.json.hbs' },
+        { type: 'file_exists', ref: 'src/services/report-linter-service.ts' },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.action).toBe('revise');
+      expect(result.data.evidence).toHaveLength(2);
+      expect(result.data.ambiguous).toEqual([]); // default normalization
+    }
+  });
+
+  it('rejects a revise decision with no evidence citations (US-032 scenario 2)', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      revisedMarkdown: '# body',
+      rationale: 'vague',
+      evidence: [],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join(' | ');
+      expect(msg).toContain('evidence citation');
+    }
+  });
+
+  it('accepts a flag decision with ambiguous entries (US-032 scenario 3)', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'US-022',
+      action: 'flag',
+      rationale: 'Intent conflict between Gherkin assertion and implementation.',
+      evidence: [
+        {
+          type: 'sibling_artifact',
+          ref: 'US-022-gherkin.feature',
+          quote: 'flags 90%+ of vague phrases',
+        },
+      ],
+      ambiguous: [
+        {
+          section: 'Acceptance Criteria',
+          reason: 'Is 90% an aspiration or a contract? Linter lacks measurement instrumentation.',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.action).toBe('flag');
+      expect(result.data.ambiguous).toHaveLength(1);
+    }
+  });
+
+  // Additional invariants beyond gherkin ------------------------------------
+
+  it('rejects a revise decision without revisedMarkdown', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      rationale: 'Missing body',
+      evidence: [{ type: 'file_absent', ref: 'src/missing.ts' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join(' | ');
+      expect(msg).toContain('revisedMarkdown');
+    }
+  });
+
+  it('rejects a flag decision with empty ambiguous array', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'US-022',
+      action: 'flag',
+      rationale: 'something ambiguous',
+      evidence: [{ type: 'sibling_artifact', ref: 'US-022' }],
+      ambiguous: [],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join(' | ');
+      expect(msg).toContain('ambiguity');
+    }
+  });
+
+  it('accepts a clean skip decision (no revisedMarkdown, no ambiguous)', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'EPIC-002',
+      action: 'skip',
+      rationale: 'No drift detected.',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.evidence).toEqual([]);
+      expect(result.data.ambiguous).toEqual([]);
+      expect(result.data.revisedMarkdown).toBeUndefined();
+    }
+  });
+
+  it('rejects a skip decision that includes revisedMarkdown', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'EPIC-002',
+      action: 'skip',
+      revisedMarkdown: '# should not be here',
+      rationale: 'contradicts skip semantics',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join(' | ');
+      expect(msg).toContain("skip' must not include revisedMarkdown");
+    }
+  });
+
+  it('rejects a skip decision that includes ambiguous entries', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'EPIC-002',
+      action: 'skip',
+      rationale: 'contradicts skip semantics',
+      ambiguous: [{ section: 'Any', reason: 'any' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join(' | ');
+      expect(msg).toContain("skip' must not include ambiguous");
+    }
+  });
+
+  it('accepts all six evidence types as valid', () => {
+    const allTypes = [
+      'file_exists',
+      'file_absent',
+      'grep_match',
+      'sibling_artifact',
+      'source_quote',
+      'pattern_rule',
+    ] as const;
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      revisedMarkdown: '# body',
+      rationale: 'Exercising evidence taxonomy',
+      evidence: allTypes.map((type) => ({ type, ref: `ref-${type}` })),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an unknown evidence type', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      revisedMarkdown: '# body',
+      rationale: 'Bad evidence type',
+      evidence: [{ type: 'telepathy', ref: 'src/anywhere.ts' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects evidence with empty ref', () => {
+    const result = aiReviseDecisionSchema.safeParse({
+      artifactId: 'TASK-007',
+      action: 'revise',
+      revisedMarkdown: '# body',
+      rationale: 'empty ref',
+      evidence: [{ type: 'file_exists', ref: '' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('defaults evidence and ambiguous to empty arrays when omitted', () => {
+    const result = aiReviseDecisionSchema.parse({
+      artifactId: 'EPIC-002',
+      action: 'skip',
+      rationale: 'omit arrays',
+    });
+    expect(result.evidence).toEqual([]);
+    expect(result.ambiguous).toEqual([]);
   });
 });

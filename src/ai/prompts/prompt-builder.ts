@@ -17,6 +17,7 @@ import {
   FEATURES_SYSTEM_PROMPT,
   QUICK_TASKS_SYSTEM_PROMPT,
   REFINE_SYSTEM_PROMPT,
+  REVISE_SYSTEM_PROMPT,
   SPRINT_AUTO_SELECT_SYSTEM_PROMPT,
   STORIES_SYSTEM_PROMPT,
   TASKS_SYSTEM_PROMPT,
@@ -304,5 +305,115 @@ export function buildRefinePrompt(
   return [
     { role: 'system', content: REFINE_SYSTEM_PROMPT },
     { role: 'user', content: userContent },
+  ];
+}
+
+/** Writable scope passed to `buildRevisePrompt`; governs what the agent may modify. */
+export type ReviseWritableScope = 'prose' | 'references' | 'paths' | 'all';
+
+/** A saved artifact (target, parent, or sibling) passed to `buildRevisePrompt`. */
+export interface RevisePromptArtifact {
+  id: string;
+  type: string;
+  content: string;
+}
+
+/** One declared source-of-truth document injected into the revise prompt. */
+export interface RevisePromptSource {
+  label: string;
+  content: string;
+}
+
+/**
+ * Full context pack for a single revise agent call.
+ *
+ * The builder stays synchronous — the caller (revise-service) is responsible
+ * for reading the target artifact, its parent chain, its siblings, and any
+ * codebase / source context before invoking this function. This keeps prompt
+ * composition a pure function that is easy to test.
+ */
+export interface RevisePromptContext {
+  artifact: RevisePromptArtifact;
+  parents: RevisePromptArtifact[];
+  siblings: RevisePromptArtifact[];
+  /** Pre-rendered string from `formatCodebaseContext`; omit in fast mode. */
+  codebaseContextFormatted?: string;
+  sources: RevisePromptSource[];
+  writableScope: ReviseWritableScope;
+  /**
+   * Canonical `## Section` names for this artifact type (from the matching
+   * Handlebars template). When provided, the prompt emits a
+   * `[TEMPLATE_STRUCTURE]` section telling the agent to stay within this
+   * section set — preventing additive drift like adding a task-level
+   * `## Relevant Files` section to an epic. Omit to skip the hint.
+   */
+  canonicalSections?: readonly string[];
+}
+
+/**
+ * Build the message array for a `planr revise` agent call.
+ *
+ * Emits labeled sections exactly as `REVISE_SYSTEM_PROMPT` expects:
+ * `[TARGET_ARTIFACT]`, `[PARENT_CHAIN]`, `[SIBLINGS]`, `[CODEBASE_CONTEXT]`,
+ * `[DECLARED_SOURCES]`, `[WRITABLE_SCOPE]`. Missing sections render as
+ * explicit "(none)" / "(not loaded)" markers rather than being dropped, so
+ * the agent can distinguish "checked and empty" from "not provided."
+ */
+export function buildRevisePrompt(ctx: RevisePromptContext): AIMessage[] {
+  const sections: string[] = [];
+
+  sections.push(
+    `[TARGET_ARTIFACT] (type=${ctx.artifact.type}, id=${ctx.artifact.id})\n${ctx.artifact.content}`,
+  );
+
+  if (ctx.parents.length > 0) {
+    const parentBlock = ctx.parents
+      .map((p) => `--- ${p.type} ${p.id} ---\n${p.content}`)
+      .join('\n\n');
+    sections.push(`[PARENT_CHAIN]\n${parentBlock}`);
+  } else {
+    sections.push(`[PARENT_CHAIN]\n(none — this is a top-level artifact)`);
+  }
+
+  if (ctx.siblings.length > 0) {
+    const siblingBlock = ctx.siblings
+      .map((s) => `--- ${s.type} ${s.id} ---\n${s.content}`)
+      .join('\n\n');
+    sections.push(`[SIBLINGS]\n${siblingBlock}`);
+  } else {
+    sections.push(`[SIBLINGS]\n(none)`);
+  }
+
+  if (ctx.codebaseContextFormatted) {
+    sections.push(`[CODEBASE_CONTEXT]\n${ctx.codebaseContextFormatted}`);
+  } else {
+    sections.push(`[CODEBASE_CONTEXT]\n(not loaded — fast mode or --no-code-context)`);
+  }
+
+  if (ctx.sources.length > 0) {
+    const sourceBlock = ctx.sources.map((s) => `--- ${s.label} ---\n${s.content}`).join('\n\n');
+    sections.push(`[DECLARED_SOURCES]\n${sourceBlock}`);
+  } else {
+    sections.push(
+      `[DECLARED_SOURCES]\n(no sources declared in .planr/revise.yaml, or no files matched the configured globs)`,
+    );
+  }
+
+  if (ctx.canonicalSections && ctx.canonicalSections.length > 0) {
+    const list = ctx.canonicalSections.map((s) => `  ## ${s}`).join('\n');
+    sections.push(
+      `[TEMPLATE_STRUCTURE]\nCanonical sections for this artifact type (from the project template):\n${list}\n\nDo NOT add sections outside this list. If drift motivates a new section, emit 'flag' with an ambiguous entry instead of 'revise'. You MAY rewrite the content of existing sections and you MAY keep sections already present in the TARGET_ARTIFACT even if they fall outside this list (they are a user-maintained custom section, not drift for you to remove).`,
+    );
+  } else {
+    sections.push(
+      `[TEMPLATE_STRUCTURE]\n(no canonical section list enforced for this artifact type — preserve the TARGET_ARTIFACT's existing section structure unless drift clearly motivates a change)`,
+    );
+  }
+
+  sections.push(`[WRITABLE_SCOPE]\n${ctx.writableScope}`);
+
+  return [
+    { role: 'system', content: REVISE_SYSTEM_PROMPT },
+    { role: 'user', content: sections.join('\n\n') },
   ];
 }
