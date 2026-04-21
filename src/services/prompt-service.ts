@@ -88,3 +88,60 @@ export async function promptMultiText(message: string, hint?: string): Promise<s
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+// ---------------------------------------------------------------------------
+// Revise command prompts (EPIC-003, FEAT-011 §5.0)
+// ---------------------------------------------------------------------------
+
+/** One action the user can take at the diff-preview prompt for a proposed revise. */
+export type ReviseConfirmAction = 'apply' | 'skip' | 'edit-rationale' | 'diff-again' | 'quit';
+
+const REVISE_CONFIRM_CHOICES: Array<{ name: string; value: ReviseConfirmAction }> = [
+  { name: '[a] Apply — write this revision to disk', value: 'apply' },
+  { name: '[s] Skip — do not write; cascade continues', value: 'skip' },
+  { name: '[e] Edit rationale — record a human reason for this decision', value: 'edit-rationale' },
+  { name: '[d] Diff again — re-print the diff', value: 'diff-again' },
+  { name: '[q] Quit — stop cascade; already-applied artifacts remain applied', value: 'quit' },
+];
+
+/**
+ * Prompt the user for the per-artifact revise confirmation menu. In
+ * non-interactive mode, returns `apply` by default (caller should only
+ * enter this path after the typed-YES gate in `confirmBulkRevise`).
+ */
+export async function promptReviseConfirm(artifactId: string): Promise<ReviseConfirmAction> {
+  if (isNonInteractive()) {
+    logger.dim(`  [auto] Revise ${artifactId} → apply`);
+    return 'apply';
+  }
+  return select({
+    message: `Revise ${artifactId}:`,
+    choices: REVISE_CONFIRM_CHOICES,
+    default: 'apply',
+  });
+}
+
+/**
+ * Typed-YES confirmation gate for `--yes` bulk-apply runs.
+ *
+ * In an interactive TTY, prints the provided summary and blocks on the user
+ * typing "YES" (case-sensitive) to proceed. In non-TTY environments
+ * (piped stdout, CI), returns `true` unconditionally — the `--yes` flag
+ * alone is the contract with the pipeline, and PR review is the upstream
+ * human gate. Returns `false` if the user types anything other than "YES".
+ */
+export async function confirmBulkRevise(summary: string): Promise<boolean> {
+  // Non-TTY: the flag is sufficient. Humans can't type at pipelines.
+  if (!process.stdout.isTTY) {
+    logger.dim('Non-interactive environment detected — --yes flag accepted without typed-YES.');
+    return true;
+  }
+  if (isNonInteractive()) {
+    // Explicit --no-interactive / -y also skips the typed-YES.
+    logger.dim('Non-interactive mode — --yes flag accepted without typed-YES.');
+    return true;
+  }
+  logger.info(summary);
+  const typed = await input({ message: 'Type YES to continue:' });
+  return typed === 'YES';
+}

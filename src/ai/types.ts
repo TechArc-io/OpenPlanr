@@ -57,6 +57,8 @@ export const TOKEN_BUDGETS = {
   estimate: 4096,
   backlogPrioritize: 8192,
   sprintAutoSelect: 8192,
+  /** `planr revise` — decision JSON is small, but revisedMarkdown may rewrite a full artifact. */
+  revise: 16384,
 } as const;
 
 export interface AIProvider {

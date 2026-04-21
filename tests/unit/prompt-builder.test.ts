@@ -3,8 +3,10 @@ import {
   buildEpicPrompt,
   buildFeaturesPrompt,
   buildRefinePrompt,
+  buildRevisePrompt,
   buildStoriesPrompt,
   buildTasksPrompt,
+  type RevisePromptContext,
 } from '../../src/ai/prompts/prompt-builder.js';
 
 describe('buildEpicPrompt', () => {
@@ -177,5 +179,141 @@ describe('buildRefinePrompt', () => {
     const messages = buildRefinePrompt('# My Epic\n\nDetails', 'epic');
     expect(messages[1].content).toContain('# My Epic');
     expect(messages[1].content).toContain('epic');
+  });
+});
+
+describe('buildRevisePrompt', () => {
+  const baseCtx: RevisePromptContext = {
+    artifact: { id: 'TASK-007', type: 'task', content: '# TASK-007\n\nSome body' },
+    parents: [],
+    siblings: [],
+    sources: [],
+    writableScope: 'all',
+  };
+
+  it('returns system and user messages', () => {
+    const messages = buildRevisePrompt(baseCtx);
+    expect(messages).toHaveLength(2);
+    expect(messages[0].role).toBe('system');
+    expect(messages[1].role).toBe('user');
+  });
+
+  it('labels the target artifact with id and type', () => {
+    const messages = buildRevisePrompt(baseCtx);
+    expect(messages[1].content).toContain('[TARGET_ARTIFACT]');
+    expect(messages[1].content).toContain('type=task');
+    expect(messages[1].content).toContain('id=TASK-007');
+    expect(messages[1].content).toContain('# TASK-007');
+  });
+
+  it('emits explicit "(none)" markers when optional sections are empty', () => {
+    const messages = buildRevisePrompt(baseCtx);
+    expect(messages[1].content).toContain('[PARENT_CHAIN]\n(none — this is a top-level artifact)');
+    expect(messages[1].content).toContain('[SIBLINGS]\n(none)');
+    expect(messages[1].content).toContain('[CODEBASE_CONTEXT]\n(not loaded');
+    expect(messages[1].content).toContain('[DECLARED_SOURCES]\n(no sources');
+  });
+
+  it('includes parent chain content when provided (US-034 scenario)', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      parents: [
+        { id: 'EPIC-002', type: 'epic', content: '# Epic body' },
+        { id: 'FEAT-007', type: 'feature', content: '# Feature body' },
+      ],
+    });
+    expect(messages[1].content).toContain('[PARENT_CHAIN]');
+    expect(messages[1].content).toContain('--- epic EPIC-002 ---');
+    expect(messages[1].content).toContain('# Epic body');
+    expect(messages[1].content).toContain('--- feature FEAT-007 ---');
+    expect(messages[1].content).toContain('# Feature body');
+  });
+
+  it('includes sibling artifacts when provided', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      siblings: [{ id: 'TASK-006', type: 'task', content: '# Sibling task body' }],
+    });
+    expect(messages[1].content).toContain('[SIBLINGS]');
+    expect(messages[1].content).toContain('--- task TASK-006 ---');
+    expect(messages[1].content).toContain('# Sibling task body');
+  });
+
+  it('includes codebase context when provided', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      codebaseContextFormatted: '## Tech Stack\nnode + typescript',
+    });
+    expect(messages[1].content).toContain('[CODEBASE_CONTEXT]\n## Tech Stack');
+    expect(messages[1].content).not.toContain('(not loaded');
+  });
+
+  it('includes declared sources when provided', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      sources: [
+        { label: 'PRD-platform.md', content: 'Product vision document' },
+        { label: '.cursor/rules/components.mdc', content: 'Use atomic design' },
+      ],
+    });
+    expect(messages[1].content).toContain('[DECLARED_SOURCES]');
+    expect(messages[1].content).toContain('--- PRD-platform.md ---');
+    expect(messages[1].content).toContain('Product vision document');
+    expect(messages[1].content).toContain('--- .cursor/rules/components.mdc ---');
+  });
+
+  it('emits the writable scope verbatim', () => {
+    const messages = buildRevisePrompt({ ...baseCtx, writableScope: 'prose' });
+    expect(messages[1].content).toContain('[WRITABLE_SCOPE]\nprose');
+  });
+
+  it('emits [TEMPLATE_STRUCTURE] with canonical sections when provided', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      canonicalSections: ['Business Value', 'Problem Statement', 'Risks', 'Features'],
+    });
+    const content = messages[1].content;
+    expect(content).toContain('[TEMPLATE_STRUCTURE]');
+    expect(content).toContain('## Business Value');
+    expect(content).toContain('## Problem Statement');
+    expect(content).toContain('## Risks');
+    expect(content).toContain('## Features');
+    // The prompt should instruct the agent to flag rather than add new sections.
+    expect(content).toContain("emit 'flag'");
+  });
+
+  it('emits a fallback [TEMPLATE_STRUCTURE] note when no canonical sections are provided', () => {
+    const messages = buildRevisePrompt(baseCtx);
+    expect(messages[1].content).toContain('[TEMPLATE_STRUCTURE]');
+    expect(messages[1].content).toContain('no canonical section list enforced');
+  });
+
+  it('emits an empty canonical sections list as the fallback (treats empty === missing)', () => {
+    const messages = buildRevisePrompt({ ...baseCtx, canonicalSections: [] });
+    expect(messages[1].content).toContain('no canonical section list enforced');
+  });
+
+  it('produces a stable section order matching the system prompt expectations', () => {
+    const messages = buildRevisePrompt({
+      ...baseCtx,
+      canonicalSections: ['Business Value', 'Features'],
+    });
+    const content = messages[1].content;
+    const idx = {
+      target: content.indexOf('[TARGET_ARTIFACT]'),
+      parents: content.indexOf('[PARENT_CHAIN]'),
+      siblings: content.indexOf('[SIBLINGS]'),
+      code: content.indexOf('[CODEBASE_CONTEXT]'),
+      sources: content.indexOf('[DECLARED_SOURCES]'),
+      template: content.indexOf('[TEMPLATE_STRUCTURE]'),
+      scope: content.indexOf('[WRITABLE_SCOPE]'),
+    };
+    expect(idx.target).toBeGreaterThanOrEqual(0);
+    expect(idx.target).toBeLessThan(idx.parents);
+    expect(idx.parents).toBeLessThan(idx.siblings);
+    expect(idx.siblings).toBeLessThan(idx.code);
+    expect(idx.code).toBeLessThan(idx.sources);
+    expect(idx.sources).toBeLessThan(idx.template);
+    expect(idx.template).toBeLessThan(idx.scope);
   });
 });

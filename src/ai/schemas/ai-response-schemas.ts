@@ -178,3 +178,92 @@ export const aiRefineResponseSchema = z.object({
 });
 
 export type AIRefineResponse = z.infer<typeof aiRefineResponseSchema>;
+
+// --- Revise (EPIC-003) ---
+
+export const aiReviseActionSchema = z.enum(['revise', 'skip', 'flag']);
+
+export const aiReviseEvidenceTypeSchema = z.enum([
+  'file_exists',
+  'file_absent',
+  'grep_match',
+  'sibling_artifact',
+  'source_quote',
+  'pattern_rule',
+]);
+
+export const aiReviseEvidenceSchema = z.object({
+  type: aiReviseEvidenceTypeSchema,
+  ref: z.string().min(1),
+  quote: z.string().optional(),
+});
+
+export const aiReviseAmbiguitySchema = z.object({
+  section: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+/**
+ * Schema for a single revise agent decision.
+ *
+ * Action-specific invariants (enforced via `superRefine`):
+ * - `revise` → non-empty `revisedMarkdown` AND at least one `evidence` entry
+ * - `flag`   → at least one `ambiguous` entry (evidence encouraged but not required)
+ * - `skip`   → no `revisedMarkdown`, no `ambiguous` entries
+ *
+ * The TS shape in `ReviseDecision` (src/models/types.ts) is the consumer-facing
+ * view; this schema is what the AI response is validated against before it
+ * reaches the post-flight verifier.
+ */
+export const aiReviseDecisionSchema = z
+  .object({
+    artifactId: z.string().min(1),
+    action: aiReviseActionSchema,
+    revisedMarkdown: z.string().optional(),
+    rationale: z.string().min(1),
+    evidence: z.array(aiReviseEvidenceSchema).default([]),
+    ambiguous: z.array(aiReviseAmbiguitySchema).default([]),
+  })
+  .superRefine((decision, ctx) => {
+    if (decision.action === 'revise') {
+      if (!decision.revisedMarkdown || decision.revisedMarkdown.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: "action 'revise' requires non-empty revisedMarkdown",
+          path: ['revisedMarkdown'],
+        });
+      }
+      if (decision.evidence.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: "action 'revise' requires at least one evidence citation",
+          path: ['evidence'],
+        });
+      }
+    }
+    if (decision.action === 'flag' && decision.ambiguous.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "action 'flag' requires at least one ambiguity entry",
+        path: ['ambiguous'],
+      });
+    }
+    if (decision.action === 'skip') {
+      if (decision.revisedMarkdown && decision.revisedMarkdown.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: "action 'skip' must not include revisedMarkdown",
+          path: ['revisedMarkdown'],
+        });
+      }
+      if (decision.ambiguous.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: "action 'skip' must not include ambiguous entries",
+          path: ['ambiguous'],
+        });
+      }
+    }
+  });
+
+export type AIReviseDecisionResponse = z.infer<typeof aiReviseDecisionSchema>;

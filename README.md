@@ -149,10 +149,43 @@ planr rules generate --dry-run        # preview
 | ---------------------- | --------------------------------------------------------- |
 | `planr plan`           | Full automated flow: Epic -> Features -> Stories -> Tasks |
 | `planr estimate <ID>`  | AI effort estimation (story points, hours, complexity)    |
-| `planr refine <ID>`    | AI-powered review and improvements                        |
+| `planr refine <ID>`    | AI-powered review and improvements (prose polish)         |
+| `planr revise <ID>`    | AI-driven *alignment* of planning artifacts with codebase |
 | `planr search <query>` | Full-text search across all artifacts                     |
 | `planr sync`           | Validate and fix cross-references                         |
 | `planr status`         | Planning progress with tree view and metrics              |
+
+#### `planr revise` — align planning with reality
+
+`refine` improves prose; `revise` actively rewrites planning artifacts so they match the codebase, sibling artifacts, and declared sources. Four-layer safety pipeline:
+
+1. **Clean-tree gate** — git working tree must be clean (override with `--allow-dirty`)
+2. **Agent decision** — zod-validated `revise` / `skip` / `flag` per artifact
+3. **Evidence verification** — agent must cite typed, verifiable evidence (file existence, grep matches, sibling artifacts…); unverifiable citations are dropped, and a `revise` that loses all support is demoted to `flag`
+4. **Diff preview + confirmation** — per-artifact `[a]pply / [s]kip / [e]dit / [d]iff / [q]uit`; writes are atomic with sidecar backups; full audit log emitted on every run (dry-run included)
+
+```bash
+# Single artifact, interactive
+planr revise TASK-007
+
+# Cascade top-down (epic → features → stories → tasks)
+planr revise EPIC-003 --cascade
+
+# Revise everything in the project (content-hash cache skips unchanged artifacts)
+planr revise --all --dry-run              # preview every revision
+planr revise --all --yes                  # type YES once; then non-interactive apply
+
+# CI mode — dry-run + JSON audit + non-zero exit on flagged findings
+planr revise EPIC-003 --cascade --dry-run --audit-format json --audit ./revise.json
+```
+
+After a successful apply, revise prints a suggested commit:
+
+```
+git commit -am "chore(plan): revise EPIC-003 against codebase"
+```
+
+Post-flight graph-integrity check runs after every non-dry-run revise. If the writes leave parent/child links broken, revise automatically rolls back via `git checkout` (which is why clean-tree is required by default). Full design in [.planr/EPIC-REVISE-COMMAND.md](.planr/EPIC-REVISE-COMMAND.md).
 
 ### GitHub & Export
 
