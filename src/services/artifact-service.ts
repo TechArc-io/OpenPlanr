@@ -4,6 +4,7 @@ import { ensureDir, listFiles, readFile, writeFile } from '../utils/fs.js';
 import { logger } from '../utils/logger.js';
 import { parseMarkdown } from '../utils/markdown.js';
 import { slugify } from '../utils/slugify.js';
+import { atomicWriteFile } from './atomic-write-service.js';
 import { getNextId } from './id-service.js';
 import { renderTemplate } from './template-service.js';
 
@@ -132,7 +133,7 @@ export async function updateArtifact(
   if (files.length === 0) throw new Error(`Artifact ${id} not found.`);
 
   const filePath = path.join(dir, files[0]);
-  await writeFile(filePath, content);
+  await atomicWriteFile(filePath, content);
 }
 
 /**
@@ -180,7 +181,11 @@ export async function updateArtifactFields(
     const replacement = `${key}: ${yamlEscape(value)}`;
 
     if (pattern.test(frontmatter)) {
-      frontmatter = frontmatter.replace(pattern, replacement);
+      // Function form bypasses regex replacement specials (`$1`, `$&`, `` $` ``,
+      // `$'`, `$$`) in the replacement string. Needed because `yamlEscape`
+      // only escapes `\` and `"`; a value containing `$1` would otherwise be
+      // interpreted as a backreference and silently corrupt the frontmatter.
+      frontmatter = frontmatter.replace(pattern, () => replacement);
     } else {
       // Insert missing field before the closing ---
       frontmatter += `\n${replacement}`;

@@ -851,6 +851,77 @@ planr config set-agent cursor            # set directly
 
 ---
 
+### `planr linear init`
+
+Authenticate to [Linear](https://linear.app) with a personal access token, choose a team, and save `linear.teamId` and `linear.teamKey` in `.planr/config.json`. The token is stored via the credentials service (or the `PLANR_LINEAR_TOKEN` environment variable) and is never written into `config.json`.
+
+```bash
+planr linear init
+```
+
+### `planr linear sync`
+
+**Two steps in one command:** (1) fetch the current **workflow state name** for every Feature and Story with a `linearIssueId` and map it to OpenPlanr `status` (same rules as `linear.statusMap`); (2) run **task checklist** sync (`TASK-*.md` ↔ Linear) for all task files that share a `linearIssueId` (see `planr linear tasklist-sync`). Use `--verbose` to log per-artifact work.
+
+```bash
+planr linear sync
+planr linear sync --dry-run
+planr linear sync --on-conflict linear
+planr --verbose linear sync
+```
+
+| Option | Description |
+| ------ | ----------- |
+| `--dry-run` | Read from Linear to compare, but do **not** write local frontmatter or Linear issue bodies. |
+| `--on-conflict` | `prompt` (default), `local`, or `linear` for checkbox merge (same as `tasklist-sync`). |
+
+**Config:** `linear.statusMap` — keys are Linear state names (e.g. `"Code Review"`), values are one of `pending`, `in-progress`, `done`. Custom teams merge with built-in defaults. See `planr linear status` (below) to inspect which artifacts have Linear ids.
+
+### `planr linear status`
+
+**Local only** — no Linear API. Prints a text table: OpenPlanr id, Linear identifier, URL, last-known `status` (or em dash for epics), and a note for malformed or stale `linearIssueId` values (e.g. a workflow state uuid mistaken for an issue id).
+
+```bash
+planr linear status
+planr linear status --scope EPIC-001
+```
+
+### `planr linear push`
+
+Create or update a **Linear project** for an epic, **top-level issues** for each feature under that epic, **sub-issues** for stories and for the per-feature task list (markdown checkboxes in the issue body), and store `linearProject*` / `linearIssue*` (and `linearTaskChecklistSyncedAt` on task files) in artifact frontmatter. Requires `planr linear init` and a team id in config.
+
+```bash
+planr linear push EPIC-001
+planr linear push EPIC-001 --dry-run   # local preview only; no Linear API calls
+planr linear push EPIC-001 --update-only
+planr linear push EPIC-001 --dry-run --update-only
+```
+
+| Argument / option | Description | Required |
+| ----------------- | ----------- | -------- |
+| `<epicId>`        | Epic id, e.g. `EPIC-001` | **Yes** |
+| `--dry-run`       | Print planned creates/updates/skips from disk; does not read credentials or call Linear | No |
+| `--update-only`   | Update only objects that already have `linearProjectId` / `linearIssueId` in frontmatter; do not create new project or issues (requires a linked project for the epic) | No |
+
+**Mapping:** Epic → Linear project; each feature → issue in that project; each story and the merged per-feature task list(s) → sub-issues of the feature issue. Optional `linear.pushStateIds` maps `pending` / `in-progress` / `done` to Linear workflow **state id** (uuid) when creating or updating issues. Optional `linear.defaultProjectLead` is the Linear user id for project `leadId`. See `planr linear sync` for pulling status **from** Linear into frontmatter.
+
+**Idempotency:** Re-running the command updates the same project and issues when `linearProjectId` / `linearIssueId` are already in frontmatter.
+
+### `planr linear tasklist-sync`
+
+Bidirectionally sync **checkbox** state between local `TASK-*.md` files and the corresponding Linear **TaskList** issues (`linearIssueId` in frontmatter). OpenPlanr reuses a single Linear issue for multiple task files in the same feature by using `## TASK-...` sections; a single file maps to the whole description. A three-way merge uses `linearChecklistReconciled` in each task’s frontmatter as the last known agreement; on divergence you can be prompted, or set `--on-conflict local` or `--on-conflict linear` (e.g. in CI).
+
+```bash
+planr linear tasklist-sync
+planr linear tasklist-sync --on-conflict linear
+```
+
+| Argument / option        | Description | Required |
+| ------------------------ | ----------- | -------- |
+| `--on-conflict <mode>`   | `prompt` (default), `local`, or `linear` when local and Linear disagree | No |
+
+---
+
 ### `planr github push`
 
 Push planning artifacts to GitHub Issues. Requires `gh` CLI to be installed and authenticated (`gh auth login`).

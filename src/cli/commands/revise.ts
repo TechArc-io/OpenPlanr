@@ -80,6 +80,8 @@ interface ReviseCommandOptions {
   siblingContext: boolean;
   audit?: string;
   auditFormat: string;
+  /** BL-005: replay a previously-written audit report with zero model calls. */
+  applyFrom?: string;
 }
 
 const DEFAULT_MAX_WRITES_PER_RUN = 50;
@@ -131,9 +133,28 @@ export function registerReviseCommand(program: Command) {
     .option('--no-sibling-context', 'skip immediate-sibling context gathering')
     .option('--audit <path>', 'override the default audit log path')
     .option('--audit-format <format>', `audit log format: ${AUDIT_FORMATS.join(', ')}`, 'md')
+    .option(
+      '--apply-from <report-path>',
+      'replay an existing dry-run audit report to disk without any model calls (BL-005). Ignores --dry-run, --cascade, --all, and AI flags; other safety gates (clean-tree, atomic write, graph integrity) still run.',
+    )
     .action(async (artifactId: string | undefined, opts: ReviseCommandOptions) => {
       const projectDir = program.opts().projectDir as string;
       const config = await loadConfig(projectDir);
+
+      // BL-005: apply-from-audit short-circuits the whole AI pipeline.
+      // Runs before all AI-path validation because this mode makes no model calls.
+      if (opts.applyFrom) {
+        const { runApplyFromAudit } = await import('../../services/revise-apply-service.js');
+        const exitCode = await runApplyFromAudit({
+          projectDir,
+          config,
+          auditPath: opts.applyFrom,
+          allowDirty: opts.allowDirty,
+          dryRun: opts.dryRun,
+          yes: opts.yes,
+        });
+        process.exit(exitCode);
+      }
 
       // Mutually-exclusive: --all vs explicit artifact id.
       if (opts.all && artifactId) {

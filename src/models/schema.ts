@@ -43,6 +43,50 @@ export const distributionConfigSchema = z.object({
   weeklyRecipientAllowlist: z.array(z.string()).optional(),
 });
 
+/**
+ * UUIDv4 regex — Linear workflow state ids follow this form. `/i` is defensive
+ * against case-normalizing tools (Linear's API emits lowercase canonically).
+ */
+const LINEAR_UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Persisted slice of LinearConfig — `planr linear init` writes `teamId` only; other fields are optional. */
+export const linearConfigSchema = z.object({
+  teamId: z.string().min(1),
+  teamKey: z.string().optional(),
+  defaultProjectLead: z.string().optional(),
+  /**
+   * Pull: Linear state name → OpenPlanr status; push legacy: `pending`|`in-progress`|`done` → state id uuid
+   * (see `pushStateIds`; both may coexist in one object in older configs).
+   */
+  statusMap: z.record(z.string(), z.string()).optional(),
+  /**
+   * Push: OpenPlanr status name → Linear workflow state id (uuid). Validated here
+   * so a typo in a UUID fails at config-load time with a clear pointer, not
+   * mid-push with a confusing SDK error.
+   */
+  pushStateIds: z
+    .record(
+      z.string(),
+      z
+        .string()
+        .regex(LINEAR_UUID_REGEX, 'linear.pushStateIds value must be a Linear workflow state UUID'),
+    )
+    .optional(),
+  /**
+   * Phase 3: target Linear project for `QT-*` / `BL-*` pushes. Must be a valid
+   * Linear project UUID — fails fast at config-load time so a typo never
+   * reaches the API.
+   */
+  standaloneProjectId: z
+    .string()
+    .regex(LINEAR_UUID_REGEX, 'linear.standaloneProjectId must be a Linear project UUID')
+    .optional(),
+  standaloneProjectName: z.string().optional(),
+  /** Phase 2: pre-pick the mapping strategy to skip the first-push prompt. */
+  defaultEpicStrategy: z.enum(['project', 'milestone-of', 'label-on']).optional(),
+});
+
 export const configSchema = z.object({
   projectName: z.string().min(1),
   targets: z.array(targetCLISchema).min(1),
@@ -69,6 +113,7 @@ export const configSchema = z.object({
   reports: stakeholderReportsConfigSchema.optional(),
   distribution: distributionConfigSchema.optional(),
   reportLinter: reportLinterConfigSchema.optional(),
+  linear: linearConfigSchema.optional(),
 });
 
 export type ValidatedConfig = z.infer<typeof configSchema>;

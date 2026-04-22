@@ -30,6 +30,14 @@ vi.mock('../../src/utils/markdown.js', () => ({
   })),
 }));
 
+vi.mock('../../src/services/atomic-write-service.js', () => ({
+  atomicWriteFile: async (targetPath: string, content: string) => {
+    const { writeFile: wf } = await import('../../src/utils/fs.js');
+    await wf(targetPath, content);
+    return { targetPath };
+  },
+}));
+
 vi.mock('../../src/services/id-service.js', () => ({
   getNextId: vi.fn(() => 'EPIC-001'),
 }));
