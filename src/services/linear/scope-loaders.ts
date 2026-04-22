@@ -232,6 +232,28 @@ export async function loadForTaskFile(
   return loadForFeature(projectDir, config, parentFeatureId);
 }
 
+/**
+ * Frontmatter sanity check for standalone artifacts. Every pushable file
+ * MUST have at least a real `title` — otherwise we end up creating a
+ * Linear issue whose title is just the artifact id (e.g. "QT-015"), and
+ * then the subsequent `updateArtifactFields` write-back fails because the
+ * file's frontmatter block is malformed. Bail here, before any API call,
+ * so the Linear side stays clean.
+ */
+function requireFrontmatter(
+  kind: 'Quick task' | 'Backlog item',
+  id: string,
+  filePath: string,
+  data: Record<string, unknown>,
+): void {
+  const title = toOptionalString(data.title);
+  if (!title) {
+    throw new Error(
+      `${kind} ${id} has no \`title\` field in its frontmatter.\n  ${filePath}\n  Fix the file's frontmatter (must be a \`---\`-delimited YAML block with at least \`id\` and \`title\`) and re-run. No changes were pushed to Linear.`,
+    );
+  }
+}
+
 export async function loadForQuickTask(
   projectDir: string,
   config: OpenPlanrConfig,
@@ -239,10 +261,11 @@ export async function loadForQuickTask(
 ): Promise<ScopedStandaloneArtifact | null> {
   const art = await readArtifact(projectDir, config, 'quick', qtId);
   if (!art) return null;
+  requireFrontmatter('Quick task', qtId, art.filePath, art.data);
   const raw = (await readArtifactRaw(projectDir, config, 'quick', qtId)) ?? '';
   return {
     id: (art.data.id as string) || qtId,
-    title: (art.data.title as string) || qtId,
+    title: art.data.title as string,
     raw,
     frontmatter: art.data,
   };
@@ -255,10 +278,11 @@ export async function loadForBacklogItem(
 ): Promise<ScopedStandaloneArtifact | null> {
   const art = await readArtifact(projectDir, config, 'backlog', blId);
   if (!art) return null;
+  requireFrontmatter('Backlog item', blId, art.filePath, art.data);
   const raw = (await readArtifactRaw(projectDir, config, 'backlog', blId)) ?? '';
   return {
     id: (art.data.id as string) || blId,
-    title: (art.data.title as string) || blId,
+    title: art.data.title as string,
     raw,
     frontmatter: art.data,
   };

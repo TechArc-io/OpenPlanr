@@ -4,7 +4,6 @@
  */
 
 import type { LinearClient } from '@linear/sdk';
-import { parseTaskMarkdown } from '../agents/task-parser.js';
 import type {
   LinearMappingStrategy,
   OpenPlanrConfig,
@@ -23,6 +22,7 @@ import {
   buildEpicProjectDescription,
   buildFeatureIssueBody,
   buildMergedTaskListBody,
+  buildStandaloneArtifactBody,
   buildStoryIssueBody,
   formatTaskCheckboxBody,
   toOptionalString,
@@ -608,35 +608,49 @@ async function pushEpicScope(
   for (const q of quicks.sort(sortByArtifactId)) {
     const art = await readArtifact(projectDir, config, 'quick', q.id);
     if (!art || getLinkedEpicId(art.data) !== epic.id) continue;
-    const qt = await loadForQuickTask(projectDir, config, q.id);
-    if (!qt) continue;
-    await pushOneQuickTaskWithContext(
-      projectDir,
-      config,
-      client,
-      qt,
-      strategyCtx,
-      typeLabelCache,
-      teamId,
-      updateOnly,
-    );
+    try {
+      const qt = await loadForQuickTask(projectDir, config, q.id);
+      if (!qt) continue;
+      await pushOneQuickTaskWithContext(
+        projectDir,
+        config,
+        client,
+        qt,
+        strategyCtx,
+        typeLabelCache,
+        teamId,
+        updateOnly,
+      );
+    } catch (err) {
+      // Keep the cascade going — a single malformed QT shouldn't abort the
+      // whole epic push. Surface the reason so the operator can fix it.
+      logger.warn(
+        `Skipping quick task ${q.id} in epic cascade: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
   const backlogs = await listArtifacts(projectDir, config, 'backlog');
   for (const b of backlogs.sort(sortByArtifactId)) {
     const art = await readArtifact(projectDir, config, 'backlog', b.id);
     if (!art || getLinkedEpicId(art.data) !== epic.id) continue;
-    const bl = await loadForBacklogItem(projectDir, config, b.id);
-    if (!bl) continue;
-    await pushOneBacklogItemWithContext(
-      projectDir,
-      config,
-      client,
-      bl,
-      strategyCtx,
-      typeLabelCache,
-      teamId,
-      updateOnly,
-    );
+    try {
+      const bl = await loadForBacklogItem(projectDir, config, b.id);
+      if (!bl) continue;
+      await pushOneBacklogItemWithContext(
+        projectDir,
+        config,
+        client,
+        bl,
+        strategyCtx,
+        typeLabelCache,
+        teamId,
+        updateOnly,
+      );
+    } catch (err) {
+      logger.warn(
+        `Skipping backlog item ${b.id} in epic cascade: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   return plan;
@@ -910,8 +924,9 @@ async function pushOneQuickTaskWithContext(
   teamId: string,
   updateOnly: boolean,
 ): Promise<void> {
-  const parsed = parseTaskMarkdown(qt.raw);
-  const body = parsed.length > 0 ? formatTaskCheckboxBody(parsed) : '';
+  // Push the full markdown body (minus frontmatter + top-level title heading)
+  // so prose content and checkbox lists both land in Linear verbatim.
+  const body = buildStandaloneArtifactBody(qt.raw, qt.id);
   const title = qt.title.trim();
   const typeLabelId = await typeLabelCache('quick');
   const rawExistingId = toOptionalString(qt.frontmatter.linearIssueId);

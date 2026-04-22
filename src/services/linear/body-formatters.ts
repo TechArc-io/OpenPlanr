@@ -106,6 +106,37 @@ export async function buildMergedTaskListBody(
 }
 
 /**
+ * Extract the markdown body of a standalone artifact (QT / BL) for pushing
+ * to Linear as an issue description.
+ *
+ * Strips:
+ *   - the frontmatter block (YAML between the `---` markers)
+ *   - the top-level `# <ID>: <title>` heading (Linear shows the title
+ *     separately, so repeating it in the description is noise)
+ *
+ * Everything else — prose, sub-headings, checkbox lists — is preserved
+ * verbatim. Linear renders standard markdown, so checkboxes stay checkboxes,
+ * `## sections` stay sections, links stay clickable.
+ */
+export function buildStandaloneArtifactBody(raw: string, id: string): string {
+  // Strip frontmatter if present.
+  let body = raw;
+  const fmMatch = /^---[^\S\r\n]*\r?\n[\s\S]*?\r?\n---[^\S\r\n]*\r?\n?/.exec(raw);
+  if (fmMatch) {
+    body = raw.slice(fmMatch[0].length);
+  }
+  // Drop leading blank lines — markdown files typically have a blank line
+  // between the frontmatter's closing `---` and the first `#` heading.
+  body = body.replace(/^\s*\r?\n/, '').trimStart();
+  // Strip a single top-level `# <ID>:...` or `# <anything>` heading at the
+  // start of the body, plus the blank line that typically follows it.
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const titleHeadingRegex = new RegExp(`^#\\s+(?:${escapedId}:\\s*)?.*\\r?\\n(?:\\r?\\n)?`);
+  body = body.replace(titleHeadingRegex, '');
+  return body.trimEnd();
+}
+
+/**
  * Backlog item → Linear issue body. Priority + tags + description + optional
  * acceptance criteria + notes. Accepts the generic frontmatter record shape
  * because backlog items aren't currently loaded via a typed interface.

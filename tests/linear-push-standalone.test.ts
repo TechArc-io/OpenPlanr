@@ -178,6 +178,29 @@ describe('runLinearPush — QT push', () => {
     expect(raw).toContain('linearIssueId:');
     expect(raw).toContain('linearIssueUrl:');
   });
+
+  it('pushes the full markdown body (prose + checkboxes + sub-headings), not just checkboxes', async () => {
+    // Simulate a QT with prose sections alongside the checkbox list — the
+    // previous push dropped everything that wasn't a checkbox line.
+    rmSync(join(projectDir, '.planr', 'quick'), { recursive: true });
+    await ensureDir(join(projectDir, '.planr', 'quick'));
+    await writeFile(
+      join(projectDir, '.planr', 'quick', 'QT-007-prose.md'),
+      `---\nid: "QT-007"\ntitle: "QT-007 title"\nstatus: "pending"\n---\n\n# QT-007: QT-007 title\n\n## Context\n\nBackground prose that describes why this matters.\n\n## Tasks\n\n- [ ] **1.0** Do the thing\n\n## Notes\n\nExtra notes that must land in Linear.\n`,
+    );
+    const fake = makeFakeClient();
+    await runLinearPush(projectDir, config, fake.client, 'QT-007');
+    const input = fake.lastIssueInput();
+    const description = String(input?.description);
+    expect(description).toContain('## Context');
+    expect(description).toContain('Background prose');
+    expect(description).toContain('- [ ] **1.0** Do the thing');
+    expect(description).toContain('## Notes');
+    expect(description).toContain('Extra notes that must land in Linear.');
+    // Top-level `# QT-007: title` heading is stripped — Linear shows the
+    // title in its own field, so repeating it in the description is noise.
+    expect(description).not.toMatch(/^#\s+QT-007:/m);
+  });
 });
 
 describe('runLinearPush — BL push', () => {

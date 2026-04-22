@@ -288,6 +288,21 @@ describe('Epic-linked QT push', () => {
     );
     expect(fake.calls.createIssue).not.toHaveBeenCalled();
   });
+
+  it('QT with empty frontmatter (broken file) throws pre-flight, zero API calls', async () => {
+    // Simulate a QT file whose frontmatter block is malformed enough that the
+    // parser returns empty data (e.g. no closing `---`). This would previously
+    // slip through and create a Linear issue titled "QT-100" with no body.
+    await writeFile(
+      join(projectDir, '.planr', 'quick', 'QT-100-broken.md'),
+      '---\nbroken: no closing delimiter\n# QT-100: some header\n',
+    );
+    const fake = makeFakeClient();
+    await expect(runLinearPush(projectDir, config, fake.client, 'QT-100')).rejects.toThrow(
+      /no `title` field in its frontmatter/,
+    );
+    expect(fake.calls.createIssue).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
