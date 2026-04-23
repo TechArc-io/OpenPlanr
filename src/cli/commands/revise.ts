@@ -365,7 +365,7 @@ async function runSingle(
     interrupted: result.quit ? { reason: 'q', atArtifactId: artifactId } : undefined,
   });
 
-  renderFinalOutcome(result, artifactId);
+  renderFinalOutcome(result, artifactId, writer.path);
 }
 
 // ---------------------------------------------------------------------------
@@ -748,7 +748,69 @@ function renderDecision(decision: ReviseDecision, originalContent: string): void
   display.separator(60);
 }
 
-function renderFinalOutcome(result: ProcessOneResult, artifactId: string): void {
+/**
+ * Print actionable next-step guidance for each terminal outcome.
+ *
+ * Users shouldn't be left wondering "now what?" after a non-trivial outcome.
+ * The most common confusion is `flagged` — the agent produced something but
+ * the safety pipeline refused to write it, and nothing in the terminal
+ * tells the user how to proceed.
+ */
+function renderNextSteps(
+  result: ProcessOneResult,
+  artifactId: string,
+  auditPath: string | undefined,
+): void {
+  const auditHint = auditPath ? `\n  Audit log (full proposal + evidence): ${auditPath}` : '';
+
+  if (result.outcome === 'flagged') {
+    logger.dim(
+      `\nNext steps for flagged revise:` +
+        `${auditHint}` +
+        `\n  1. Read the audit log — it includes the agent's proposed rewrite and rationale.` +
+        `\n  2. If the proposal is right but evidence is weak, edit ${artifactId} manually to apply the fix.` +
+        `\n  3. To narrow what the agent touches, re-run with \`--scope-to prose\` (preserves references and paths).` +
+        `\n  4. To let the agent retry without stale context, re-run with \`--no-code-context\` (faster, less grounded).`,
+    );
+    return;
+  }
+
+  if (result.outcome === 'would-apply') {
+    logger.dim(
+      `\nNext steps for dry-run:` +
+        `${auditHint}` +
+        `\n  Re-run without \`--dry-run\` to apply the proposed changes to ${artifactId}.`,
+    );
+    return;
+  }
+
+  if (result.outcome === 'unchanged-by-agent') {
+    logger.dim(
+      `\nNo action needed — ${artifactId} already matches the agent's reading of the codebase.`,
+    );
+    return;
+  }
+
+  if (result.outcome === 'skipped-by-agent') {
+    logger.dim(
+      `\nAgent said no drift detected. If you disagree, edit ${artifactId} manually or re-run with` +
+        ` a narrower \`--scope-to\` to prompt the agent toward the section you expected it to touch.`,
+    );
+    return;
+  }
+
+  if (result.outcome === 'skipped-by-user') {
+    logger.dim(
+      `\nSkipped — re-run \`planr revise ${artifactId}\` when you're ready to reconsider.`,
+    );
+  }
+}
+
+function renderFinalOutcome(
+  result: ProcessOneResult,
+  artifactId: string,
+  auditPath: string | undefined,
+): void {
   const badge =
     result.outcome === 'applied'
       ? chalk.green('applied')
@@ -765,6 +827,7 @@ function renderFinalOutcome(result: ProcessOneResult, artifactId: string): void 
       `\nWrote ${result.artifactPath}\nSuggested commit: git commit -am "chore(plan): revise ${artifactId} against codebase"`,
     );
   }
+  renderNextSteps(result, artifactId, auditPath);
   if (result.usage.inputTokens > 0) {
     logger.dim(
       `Tokens: ${result.usage.inputTokens.toLocaleString()} in → ${result.usage.outputTokens.toLocaleString()} out`,

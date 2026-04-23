@@ -132,7 +132,9 @@ describe('reviseArtifact', () => {
   });
 
   it('passes the raw artifact (including frontmatter) into the prompt', async () => {
-    const chatSync = vi.fn(async () => VALID_SKIP_JSON);
+    const chatSync = vi.fn<(messages: Array<{ role: string; content: string }>) => Promise<string>>(
+      async () => VALID_SKIP_JSON,
+    );
     const provider: AIProvider = {
       name: 'anthropic',
       model: 'test-model',
@@ -150,7 +152,8 @@ describe('reviseArtifact', () => {
 
     expect(chatSync).toHaveBeenCalledOnce();
     const firstCall = chatSync.mock.calls[0];
-    const messages = firstCall[0] as Array<{ role: string; content: string }>;
+    if (!firstCall) throw new Error('expected chatSync to have been called');
+    const messages = firstCall[0] as unknown as Array<{ role: string; content: string }>;
     const userMessage = messages.find((m) => m.role === 'user');
     expect(userMessage).toBeDefined();
     // Frontmatter should be included so the agent can preserve it in revisedMarkdown.
@@ -331,6 +334,56 @@ describe('applyDecision — unchanged-by-agent short-circuit', () => {
     expect(result.outcome).toBe('applied');
     expect(result.wrote).toBe(true);
     expect(readFileSync(artifactPath, 'utf-8')).toBe(revised);
+  });
+
+  it("preserves the agent's rejected rewrite as a diff in a flagged audit entry (demoted case)", async () => {
+    // Regression for the UX gap: before this, demoted revises produced a
+    // flagged audit with no way to see what the agent had proposed. Now the
+    // would-have-been diff is captured so users can read the audit and
+    // hand-apply the parts that make sense.
+    const original = '---\nid: "QT-999"\n---\n\n# QT-999\n\nold content\n';
+    const proposed = '---\nid: "QT-999"\n---\n\n# QT-999\n\nnew content\n';
+    const artifactPath = join(projectDir, 'QT-999-flag.md');
+    writeFileSync(artifactPath, original, 'utf-8');
+    const auditPath = join(backupDir, `audit-flag-${Date.now()}.json`);
+    const writer = createAuditLogWriter({
+      projectDir,
+      scope: 'test',
+      cascade: false,
+      dryRun: false,
+      format: 'json',
+      overridePath: auditPath,
+    });
+
+    const result = await applyDecision({
+      artifactPath,
+      originalContent: original,
+      // Simulates a post-verifier demoted decision: action=flag, but
+      // revisedMarkdown still carries the agent's proposed rewrite.
+      decision: baseDecision({
+        artifactId: 'QT-999-flag',
+        action: 'flag',
+        revisedMarkdown: proposed,
+      }),
+      backupDir,
+      audit: writer,
+      dryRun: false,
+    });
+    writer.close();
+
+    expect(result.outcome).toBe('flagged');
+    expect(result.wrote).toBe(false);
+    // The file is NOT written (flagged), but the diff IS present for audit.
+    expect(readFileSync(artifactPath, 'utf-8')).toBe(original);
+    expect(result.diff).toContain('old content');
+    expect(result.diff).toContain('new content');
+
+    const parsed = JSON.parse(readFileSync(auditPath, 'utf-8')) as { entries: ReviseAuditEntry[] };
+    const entry = parsed.entries.find((e) => e.artifactId === 'QT-999-flag');
+    expect(entry?.outcome).toBe('flagged');
+    expect(entry?.diff).toContain('old content');
+    expect(entry?.diff).toContain('new content');
+    expect(entry?.diff).toContain('REJECTED by verifier');
   });
 
   it('emits an `unchanged-by-agent` audit entry with no diff body', async () => {

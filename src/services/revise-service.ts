@@ -241,6 +241,17 @@ export async function applyDecision(options: ApplyDecisionOptions): Promise<Appl
   }
 
   if (decision.action === 'flag') {
+    // When a revise → flag demotion happened upstream, `revisedMarkdown`
+    // still holds the agent's proposed rewrite. Include the would-have-been
+    // diff in the audit entry so users can see what was rejected and decide
+    // whether to hand-apply it.
+    const proposedDiff = decision.revisedMarkdown
+      ? renderDiff(originalContent, decision.revisedMarkdown, {
+          color: false,
+          oldLabel: `${decision.artifactId} (before)`,
+          newLabel: `${decision.artifactId} (proposed — REJECTED by verifier)`,
+        })
+      : undefined;
     audit.appendEntry({
       artifactId: decision.artifactId,
       artifactPath,
@@ -249,9 +260,10 @@ export async function applyDecision(options: ApplyDecisionOptions): Promise<Appl
       evidence: decision.evidence,
       ambiguous: decision.ambiguous,
       cascadeLevel: options.cascadeLevel,
+      ...(proposedDiff ? { diff: proposedDiff } : {}),
       timestamp,
     });
-    return { outcome: 'flagged', wrote: false, diff: '' };
+    return { outcome: 'flagged', wrote: false, diff: proposedDiff ?? '' };
   }
 
   // action === 'revise'

@@ -128,7 +128,10 @@ export async function verifyDecision(
         ...decision,
         action: 'flag',
         evidence: verified, // keep any surviving citations in the flag record
-        revisedMarkdown: undefined,
+        // Preserve the agent's proposed rewrite so the audit log can show it
+        // as a "rejected proposal" diff. The apply path still refuses to
+        // write it (action=flag), but users can read the audit entry to
+        // see what the agent wanted and decide whether to hand-apply.
         ambiguous: [...decision.ambiguous, ambiguity],
         rationale: `${decision.rationale} [demoted: ${tag}]`,
       },
