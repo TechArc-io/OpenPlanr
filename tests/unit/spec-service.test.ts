@@ -29,6 +29,8 @@ import {
   readSpec,
   resolveSpecDir,
   shapeSpec,
+  syncAllSpecs,
+  syncSpec,
   validateSpecForPromotion,
 } from '../../src/services/spec-service.js';
 
@@ -790,6 +792,131 @@ describe('decomposeSpec', () => {
     );
     expect(authStories[0].id).toBe('US-001');
     expect(checkoutStories[0].id).toBe('US-001'); // each spec scopes its own US-NNN
+  });
+});
+
+// ---------------------------------------------------------------------------
+// syncSpec / syncAllSpecs tests
+// ---------------------------------------------------------------------------
+
+describe('syncSpec', () => {
+  it('reports clean for a fully decomposed spec', async () => {
+    setMockAIResponse(JSON.stringify(validDecomposition));
+    await createSpec(projectDir, config, 'Auth');
+    await decomposeSpec(projectDir, config, 'SPEC-001', { noCodeContext: true });
+    const report = await syncSpec(projectDir, config, 'SPEC-001');
+    expect(report.fixed).toEqual([]);
+    expect(report.warnings).toEqual([]);
+  });
+
+  it('detects orphaned task (storyId points to non-existent story)', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    // Create a task pointing to a non-existent story
+    await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-999',
+      title: 'Stray task',
+      type: 'Tech',
+      agent: 'backend-agent',
+    });
+
+    const report = await syncSpec(projectDir, config, 'SPEC-001');
+    expect(report.warnings.some((w) => w.includes('US-999'))).toBe(true);
+  });
+
+  it('detects story without tasks', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Lonely Story', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+    const report = await syncSpec(projectDir, config, 'SPEC-001');
+    expect(report.warnings.some((w) => w.includes('US-001 has no tasks'))).toBe(true);
+  });
+
+  it('repairs missing specId frontmatter on US/Task files', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const story = await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    // Strip specId from the story file (simulate corruption / hand-edit)
+    const original = await fs.readFile(story.filePath, 'utf-8');
+    const stripped = original.replace(/^specId: ".+"\n/m, '');
+    await fs.writeFile(story.filePath, stripped);
+
+    const report = await syncSpec(projectDir, config, 'SPEC-001');
+    expect(report.fixed.some((f) => f.includes('US-001') && f.includes('specId'))).toBe(true);
+
+    // Verify the fix was actually written
+    const after = await fs.readFile(story.filePath, 'utf-8');
+    expect(after).toContain('specId: "SPEC-001"');
+  });
+
+  it('--dry-run does not write fixes', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const story = await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    const original = await fs.readFile(story.filePath, 'utf-8');
+    const stripped = original.replace(/^specId: ".+"\n/m, '');
+    await fs.writeFile(story.filePath, stripped);
+
+    const report = await syncSpec(projectDir, config, 'SPEC-001', { dryRun: true });
+    // Report should still show the fix would happen
+    expect(report.fixed.some((f) => f.includes('[dry-run]'))).toBe(true);
+
+    // But the file should NOT have been modified
+    const after = await fs.readFile(story.filePath, 'utf-8');
+    expect(after).toBe(stripped);
+  });
+
+  it('throws on unknown spec ID', async () => {
+    await expect(syncSpec(projectDir, config, 'SPEC-999')).rejects.toThrow(/not found/);
+  });
+
+  it('flags schemaVersion drift as a warning', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    // Manually set an older schemaVersion in the SPEC frontmatter
+    const spec = await readSpec(projectDir, config, 'SPEC-001');
+    if (!spec) throw new Error('test setup failed');
+    const raw = await fs.readFile(spec.specFile, 'utf-8');
+    const downgraded = raw.replace(/schemaVersion: "[\d.]+"/, 'schemaVersion: "0.9.0"');
+    await fs.writeFile(spec.specFile, downgraded);
+
+    const report = await syncSpec(projectDir, config, 'SPEC-001');
+    expect(report.warnings.some((w) => w.includes('schemaVersion'))).toBe(true);
+  });
+});
+
+describe('syncAllSpecs', () => {
+  it('returns 0 specsScanned for empty project', async () => {
+    const result = await syncAllSpecs(projectDir, config);
+    expect(result.specsScanned).toBe(0);
+    expect(result.reports).toEqual([]);
+  });
+
+  it('aggregates reports across multiple specs', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpec(projectDir, config, 'Checkout');
+    // Only auth has stories; checkout is empty
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+
+    const result = await syncAllSpecs(projectDir, config);
+    expect(result.specsScanned).toBe(2);
+    expect(result.reports).toHaveLength(2);
+    // First report should warn about missing tasks
+    expect(result.reports[0].warnings.length).toBeGreaterThan(0);
+    // Second report (empty Checkout) should be clean
+    expect(result.reports[1].fixed).toEqual([]);
+    expect(result.reports[1].warnings).toEqual([]);
   });
 });
 

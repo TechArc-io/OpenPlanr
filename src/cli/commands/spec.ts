@@ -49,6 +49,8 @@ import {
   resolveSpecDir,
   type ShapeSpecAnswers,
   shapeSpec,
+  syncAllSpecs,
+  syncSpec,
   updateSpecFields,
   validateSpecForPromotion,
 } from '../../services/spec-service.js';
@@ -102,7 +104,7 @@ export function registerSpecCommand(program: Command) {
       display.line('  1. Author a spec:    planr spec create --title "<feature title>"');
       display.line('  2. Optional: attach: planr spec attach-design <SPEC-id> --files <png>...');
       display.line(
-        '  3. Decompose:        planr spec decompose <SPEC-id>     (AI mode, follow-up PR)',
+        '  3. Decompose:        planr spec decompose <SPEC-id>     (AI-driven US + Tasks)',
       );
       display.line('  4. Review:           planr spec show <SPEC-id>');
       display.line('  5. Promote:          planr spec promote <SPEC-id>');
@@ -145,13 +147,11 @@ export function registerSpecCommand(program: Command) {
         logger.dim('');
         display.line('Next steps:');
         display.line(`  - Edit the spec body:           ${specFile}`);
-        display.line(`  - Or use guided authoring:      planr spec shape ${id}     (follow-up PR)`);
+        display.line(`  - Or use guided authoring:      planr spec shape ${id}`);
         display.line(
           `  - Attach UI mockups (optional): planr spec attach-design ${id} --files <png>...`,
         );
-        display.line(
-          `  - Decompose into US + Tasks:    planr spec decompose ${id}  (follow-up PR)`,
-        );
+        display.line(`  - Decompose into US + Tasks:    planr spec decompose ${id}`);
         display.line(`  - Review the tree:              planr spec show ${id}`);
       } catch (err) {
         logger.error((err as Error).message);
@@ -588,5 +588,79 @@ export function registerSpecCommand(program: Command) {
       logger.dim(
         `(The pipeline plugin reads .planr/specs/${spec.id}-${spec.slug}/ directly when spec mode is active.)`,
       );
+    });
+
+  // ------------------------------------------------------------------------
+  // planr spec sync [specId]
+  // ------------------------------------------------------------------------
+  spec
+    .command('sync')
+    .description(
+      'Validate spec integrity (orphaned tasks, stories without tasks, missing specId frontmatter, schema drift)',
+    )
+    .argument('[specId]', 'optional spec ID to scope; otherwise scans all specs')
+    .option('--dry-run', 'report findings without writing any fixes', false)
+    .action(async (specId: string | undefined, opts: { dryRun?: boolean }) => {
+      const projectDir = program.opts().projectDir as string;
+      const config = await loadConfig(projectDir);
+
+      try {
+        if (specId) {
+          const report = await syncSpec(projectDir, config, specId, { dryRun: opts.dryRun });
+          logger.heading(`${report.specId}: ${report.specSlug}`);
+          if (report.fixed.length === 0 && report.warnings.length === 0) {
+            logger.success('Clean. No issues found.');
+            return;
+          }
+          if (report.fixed.length > 0) {
+            logger.success(
+              `${opts.dryRun ? 'Would fix' : 'Fixed'} ${report.fixed.length} issue${
+                report.fixed.length === 1 ? '' : 's'
+              }:`,
+            );
+            for (const f of report.fixed) {
+              display.line(`  ✓ ${f}`);
+            }
+          }
+          if (report.warnings.length > 0) {
+            logger.warn(
+              `${report.warnings.length} warning${report.warnings.length === 1 ? '' : 's'} (require human review):`,
+            );
+            for (const w of report.warnings) {
+              display.line(`  ⚠ ${w}`);
+            }
+          }
+          return;
+        }
+
+        // No specId — scan all
+        const { specsScanned, reports } = await syncAllSpecs(projectDir, config, {
+          dryRun: opts.dryRun,
+        });
+        if (specsScanned === 0) {
+          logger.info('No specs found.');
+          return;
+        }
+        const totalFixed = reports.reduce((acc, r) => acc + r.fixed.length, 0);
+        const totalWarnings = reports.reduce((acc, r) => acc + r.warnings.length, 0);
+
+        logger.heading(`Sync — ${specsScanned} spec${specsScanned === 1 ? '' : 's'} scanned`);
+        for (const r of reports) {
+          if (r.fixed.length === 0 && r.warnings.length === 0) {
+            display.line(`  ✓ ${r.specId} (${r.specSlug}) — clean`);
+            continue;
+          }
+          display.line(`  ${r.specId} (${r.specSlug}):`);
+          for (const f of r.fixed) display.line(`    ✓ ${f}`);
+          for (const w of r.warnings) display.line(`    ⚠ ${w}`);
+        }
+        logger.dim('');
+        logger.dim(
+          `Summary: ${opts.dryRun ? 'would fix' : 'fixed'} ${totalFixed}, warnings ${totalWarnings}.`,
+        );
+      } catch (err) {
+        logger.error((err as Error).message);
+        process.exit(1);
+      }
     });
 }

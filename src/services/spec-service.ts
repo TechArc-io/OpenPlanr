@@ -404,6 +404,147 @@ function formatYamlValue(value: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sync — orphaned-artifact detection + integrity repair
+// ---------------------------------------------------------------------------
+
+export interface SyncSpecReport {
+  specId: string;
+  specSlug: string;
+  /** Issues that were auto-repaired (file was rewritten). */
+  fixed: string[];
+  /** Issues that need human attention (orphans, schema drift, etc.). */
+  warnings: string[];
+}
+
+/**
+ * Validate one spec's internal integrity and repair safe inconsistencies.
+ *
+ * Checks performed:
+ *  1. Orphaned task: `task.storyId` doesn't match any existing US in the same
+ *     spec → WARN (don't auto-delete; user reviews and either fixes the
+ *     storyId or destroys the task)
+ *  2. Story without tasks: WARN (decomposition is incomplete)
+ *  3. Missing `specId` in US/Task frontmatter → AUTO-FIX from path
+ *  4. Schema version mismatch (artifact's schemaVersion older than current)
+ *     → WARN (no auto-migration in v1; flagged for follow-up)
+ *
+ * Note: this is a *read-mostly* operation. The only writes happen in case 3
+ * (adding a missing `specId` field via updateSpecFields-equivalent); all
+ * other findings are reported as warnings so the user controls the fix.
+ *
+ * `dryRun: true` skips writes entirely; only report.
+ */
+export async function syncSpec(
+  projectDir: string,
+  config: OpenPlanrConfig,
+  specId: string,
+  opts: { dryRun?: boolean } = {},
+): Promise<SyncSpecReport> {
+  const spec = await readSpec(projectDir, config, specId);
+  if (!spec) throw new Error(`Spec ${specId} not found.`);
+
+  const fixed: string[] = [];
+  const warnings: string[] = [];
+  const stories = await listSpecStories(spec.specDir);
+  const tasks = await listSpecTasks(spec.specDir);
+
+  // ── Check 1: orphaned tasks ────────────────────────────────────────────
+  const storyIds = new Set(stories.map((s) => s.id));
+  for (const t of tasks) {
+    if (!t.storyId) {
+      warnings.push(
+        `Task ${t.id} (${t.filename}) has no storyId — set it manually or via \`planr spec decompose --force\`.`,
+      );
+    } else if (!storyIds.has(t.storyId)) {
+      warnings.push(
+        `Task ${t.id} (${t.filename}) references non-existent story ${t.storyId} in this spec. ` +
+          `Fix the storyId or destroy the task.`,
+      );
+    }
+  }
+
+  // ── Check 2: stories without tasks ────────────────────────────────────
+  const tasksByStory = new Map<string, number>();
+  for (const t of tasks) {
+    if (t.storyId) tasksByStory.set(t.storyId, (tasksByStory.get(t.storyId) ?? 0) + 1);
+  }
+  for (const s of stories) {
+    if (!tasksByStory.has(s.id)) {
+      warnings.push(
+        `Story ${s.id} has no tasks — decomposition incomplete. Run \`planr spec decompose ${specId} --force\` or hand-author tasks.`,
+      );
+    }
+  }
+
+  // ── Check 3: missing specId in US/Task frontmatter ────────────────────
+  // (auto-fixable; fix from path)
+  const fs = await import('node:fs/promises');
+  for (const s of stories) {
+    const raw = await readFile(s.filePath);
+    if (!/^specId:\s*"/m.test(raw)) {
+      if (!opts.dryRun) {
+        const insertion = `\nspecId: "${specId}"`;
+        const fixedContent = raw.replace(/^id:\s*"[^"]+"$/m, (m) => m + insertion);
+        await fs.writeFile(s.filePath, fixedContent);
+      }
+      fixed.push(
+        `Story ${s.id}: added missing specId frontmatter${opts.dryRun ? ' [dry-run]' : ''}.`,
+      );
+    }
+  }
+  for (const t of tasks) {
+    const raw = await readFile(t.filePath);
+    if (!/^specId:\s*"/m.test(raw)) {
+      if (!opts.dryRun) {
+        const insertion = `\nspecId: "${specId}"`;
+        const fixedContent = raw.replace(/^id:\s*"[^"]+"$/m, (m) => m + insertion);
+        await fs.writeFile(t.filePath, fixedContent);
+      }
+      fixed.push(
+        `Task ${t.id}: added missing specId frontmatter${opts.dryRun ? ' [dry-run]' : ''}.`,
+      );
+    }
+  }
+
+  // ── Check 4: schema version drift ─────────────────────────────────────
+  const CURRENT_SCHEMA_VERSION = '1.0.0';
+  const specSchemaVersion =
+    typeof spec.data.schemaVersion === 'string' ? spec.data.schemaVersion : null;
+  if (specSchemaVersion && specSchemaVersion !== CURRENT_SCHEMA_VERSION) {
+    warnings.push(
+      `Spec uses schemaVersion ${specSchemaVersion} (current: ${CURRENT_SCHEMA_VERSION}). No auto-migration in v1 — review manually.`,
+    );
+  }
+
+  return {
+    specId: spec.id,
+    specSlug: spec.slug,
+    fixed,
+    warnings,
+  };
+}
+
+/**
+ * Run syncSpec across every spec in the project.
+ * Aggregates per-spec reports.
+ */
+export async function syncAllSpecs(
+  projectDir: string,
+  config: OpenPlanrConfig,
+  opts: { dryRun?: boolean } = {},
+): Promise<{
+  specsScanned: number;
+  reports: SyncSpecReport[];
+}> {
+  const specs = await listSpecs(projectDir, config);
+  const reports: SyncSpecReport[] = [];
+  for (const s of specs) {
+    reports.push(await syncSpec(projectDir, config, s.id, opts));
+  }
+  return { specsScanned: specs.length, reports };
+}
+
+// ---------------------------------------------------------------------------
 // Decompose — AI-driven US + Task generation
 // ---------------------------------------------------------------------------
 
