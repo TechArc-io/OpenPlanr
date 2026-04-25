@@ -27,6 +27,7 @@ import {
   listSpecTasks,
   readSpec,
   resolveSpecDir,
+  shapeSpec,
   validateSpecForPromotion,
 } from '../../src/services/spec-service.js';
 
@@ -466,6 +467,101 @@ describe('validateSpecForPromotion', () => {
     const result = await validateSpecForPromotion(projectDir, config, 'SPEC-001');
     expect(result.ready).toBe(false);
     expect(result.issues.some((i) => i.includes('very short'))).toBe(true);
+  });
+});
+
+describe('shapeSpec', () => {
+  it('populates the body from the 4-question answers', async () => {
+    const { specFile } = await createSpec(projectDir, config, 'Auth Flow', { slug: 'auth' });
+    await shapeSpec(projectDir, config, 'SPEC-001', {
+      context: 'Users need a secure way to log in to access their dashboard.',
+      functionalRequirements: [
+        'User can submit username + password',
+        'System validates credentials',
+        'On success, user is redirected to /dashboard',
+      ],
+      businessRules: 'Password must be 8+ chars. Lockout after 5 failures.',
+      outOfScope: ['SSO', 'password reset (covered in feat-pw-reset)'],
+      acceptanceCriteria: [
+        'Given valid creds, when submitting, then user reaches /dashboard',
+        'Given invalid creds, when submitting, then user sees error',
+      ],
+      decompositionNotes: 'Suggested split: 2 US — login form + session management',
+    });
+
+    const content = await fs.readFile(specFile, 'utf-8');
+    // Body content should be present
+    expect(content).toContain('Users need a secure way to log in');
+    expect(content).toContain('User can submit username + password');
+    expect(content).toContain('Password must be 8+ chars');
+    expect(content).toContain('SSO');
+    expect(content).toContain('Given valid creds, when submitting, then user reaches /dashboard');
+    expect(content).toContain('Suggested split: 2 US');
+  });
+
+  it('updates status to "shaping"', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await shapeSpec(projectDir, config, 'SPEC-001', {
+      context: 'context',
+      functionalRequirements: ['req'],
+      acceptanceCriteria: ['ac'],
+    });
+    const spec = await readSpec(projectDir, config, 'SPEC-001');
+    expect(spec?.data.status).toBe('shaping');
+  });
+
+  it('preserves frontmatter fields (priority, milestone, po, ui_files)', async () => {
+    await createSpec(projectDir, config, 'Auth', {
+      priority: 'P0',
+      milestone: 'v1.0',
+      po: '@AsemDevs',
+    });
+    // Pre-populate ui_files so we can confirm shape preserves them
+    const fakePng = path.join(projectDir, 'login.png');
+    await fs.writeFile(fakePng, 'fake');
+    await attachSpecDesigns(projectDir, config, 'SPEC-001', [fakePng]);
+
+    await shapeSpec(projectDir, config, 'SPEC-001', {
+      context: 'ctx',
+      functionalRequirements: ['req'],
+      acceptanceCriteria: ['ac'],
+    });
+
+    const spec = await readSpec(projectDir, config, 'SPEC-001');
+    expect(spec?.data.priority).toBe('P0');
+    expect(spec?.data.milestone).toBe('v1.0');
+    expect(spec?.data.po).toBe('@AsemDevs');
+    // ui_files should still be present
+    expect(spec?.data.ui_files).toContain('design/login.png');
+  });
+
+  it('throws on unknown spec ID', async () => {
+    await expect(
+      shapeSpec(projectDir, config, 'SPEC-999', {
+        context: 'c',
+        functionalRequirements: ['r'],
+        acceptanceCriteria: ['a'],
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it('handles empty businessRules / outOfScope / decompositionNotes gracefully', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await shapeSpec(projectDir, config, 'SPEC-001', {
+      context: 'just context',
+      functionalRequirements: ['just one req'],
+      acceptanceCriteria: ['just one ac'],
+      // omit optional fields entirely
+    });
+    const spec = await readSpec(projectDir, config, 'SPEC-001');
+    expect(spec).not.toBeNull();
+    if (!spec) return;
+    const content = await fs.readFile(spec.specFile, 'utf-8');
+    expect(content).toContain('just context');
+    expect(content).toContain('just one req');
+    // Should fall back to placeholder when business rules empty
+    expect(content).toContain('_None specified._');
+    expect(content).toContain('_Nothing explicitly out of scope yet._');
   });
 });
 

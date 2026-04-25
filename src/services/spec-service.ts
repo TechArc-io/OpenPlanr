@@ -378,8 +378,7 @@ export async function updateSpecFields(
   for (const [key, value] of Object.entries(allFields)) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`^${escapedKey}:\\s*.*$`, 'm');
-    const escapedVal = `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-    const replacement = `${key}: ${escapedVal}`;
+    const replacement = `${key}: ${formatYamlValue(value)}`;
     if (pattern.test(frontmatter)) {
       frontmatter = frontmatter.replace(pattern, () => replacement);
     } else {
@@ -387,6 +386,98 @@ export async function updateSpecFields(
     }
   }
   await atomicWriteFile(specFile, frontmatter + body);
+}
+
+/**
+ * Format a JS value as valid YAML for frontmatter.
+ * - Arrays → inline-flow: `["a", "b"]` (so they round-trip as arrays, not strings)
+ * - Empty arrays → `[]`
+ * - Other → double-quoted scalar with escapes
+ */
+function formatYamlValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    const items = value.map((v) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+    return `[${items.join(', ')}]`;
+  }
+  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+// ---------------------------------------------------------------------------
+// Shape — guided 4-question SPEC body authoring
+// ---------------------------------------------------------------------------
+
+/**
+ * Answers gathered by `planr spec shape` from the PO.
+ *
+ * The shape command captures four areas: business context, functional
+ * requirements, business rules / constraints, and acceptance criteria.
+ * `decompositionNotes` is optional — hints for `planr spec decompose` later.
+ */
+export interface ShapeSpecAnswers {
+  context: string;
+  functionalRequirements: string[];
+  businessRules?: string;
+  outOfScope?: string[];
+  acceptanceCriteria: string[];
+  decompositionNotes?: string;
+}
+
+/**
+ * Re-render the SPEC body from a structured set of answers and write it back
+ * atomically. Preserves frontmatter values that the user (or `planr spec
+ * create`) already set: priority, milestone, po, ui_files, created, etc.
+ *
+ * Updates `status` to `shaping` so subsequent commands (`decompose`, `promote`)
+ * can see the spec has moved past the initial empty placeholder body.
+ */
+export async function shapeSpec(
+  projectDir: string,
+  config: OpenPlanrConfig,
+  specId: string,
+  answers: ShapeSpecAnswers,
+): Promise<{ specFile: string }> {
+  const spec = await readSpec(projectDir, config, specId);
+  if (!spec) throw new Error(`Spec ${specId} not found.`);
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Carry through every frontmatter field that was already set, so we don't
+  // accidentally erase user customizations on re-shape.
+  const data = spec.data;
+  const uiFilesRaw = data.ui_files;
+  let uiFiles: string[] = [];
+  if (Array.isArray(uiFilesRaw)) {
+    uiFiles = uiFilesRaw.filter((f): f is string => typeof f === 'string');
+  }
+
+  const content = await renderTemplate(
+    'spec/spec-shaped.md.hbs',
+    {
+      id: spec.id,
+      slug: spec.slug,
+      title: typeof data.title === 'string' ? data.title : spec.slug,
+      schemaVersion: typeof data.schemaVersion === 'string' ? data.schemaVersion : '1.0.0',
+      priority: typeof data.priority === 'string' ? data.priority : 'P1',
+      milestone: typeof data.milestone === 'string' ? data.milestone : '',
+      po: typeof data.po === 'string' ? data.po : '',
+      created: typeof data.created === 'string' ? data.created : today,
+      date: today,
+      uiFiles,
+      context: answers.context.trim(),
+      functionalRequirements: answers.functionalRequirements.map((s) => s.trim()).filter(Boolean),
+      businessRules: (answers.businessRules || '').trim(),
+      outOfScope: (answers.outOfScope || []).map((s) => s.trim()).filter(Boolean),
+      acceptanceCriteria: answers.acceptanceCriteria.map((s) => s.trim()).filter(Boolean),
+      decompositionNotes: (answers.decompositionNotes || '').trim(),
+      projectName: config.projectName,
+    },
+    config.templateOverrides,
+  );
+
+  await atomicWriteFile(spec.specFile, content);
+  logger.debug(`Shaped spec ${spec.id} (status: shaping)`);
+  return { specFile: spec.specFile };
 }
 
 /**
@@ -653,11 +744,11 @@ export async function attachSpecDesigns(
   }
 
   if (copied.length > 0) {
-    // Update SPEC frontmatter ui_files (relative paths inside the spec dir)
-    const yamlList = copied.map((f) => `design/${f}`);
-    await updateSpecFields(projectDir, config, specId, {
-      ui_files: JSON.stringify(yamlList),
-    });
+    // Update SPEC frontmatter ui_files (relative paths inside the spec dir).
+    // Pass the actual array — updateSpecFields → formatYamlValue serializes
+    // it as a YAML inline-flow list so it round-trips back as an array.
+    const uiPaths = copied.map((f) => `design/${f}`);
+    await updateSpecFields(projectDir, config, specId, { ui_files: uiPaths });
   }
 
   return { copied, designDir };

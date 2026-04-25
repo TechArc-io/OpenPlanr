@@ -29,7 +29,13 @@
 import path from 'node:path';
 import type { Command } from 'commander';
 import { loadConfig, saveConfig } from '../../services/config-service.js';
-import { promptConfirm } from '../../services/prompt-service.js';
+import { requireInteractiveForManual } from '../../services/interactive-state.js';
+import {
+  promptConfirm,
+  promptEditor,
+  promptMultiText,
+  promptText,
+} from '../../services/prompt-service.js';
 import {
   attachSpecDesigns,
   createSpec,
@@ -40,6 +46,8 @@ import {
   listSpecTasks,
   readSpec,
   resolveSpecDir,
+  type ShapeSpecAnswers,
+  shapeSpec,
   updateSpecFields,
   validateSpecForPromotion,
 } from '../../services/spec-service.js';
@@ -144,6 +152,129 @@ export function registerSpecCommand(program: Command) {
           `  - Decompose into US + Tasks:    planr spec decompose ${id}  (follow-up PR)`,
         );
         display.line(`  - Review the tree:              planr spec show ${id}`);
+      } catch (err) {
+        logger.error((err as Error).message);
+        process.exit(1);
+      }
+    });
+
+  // ------------------------------------------------------------------------
+  // planr spec shape <id>
+  // ------------------------------------------------------------------------
+  spec
+    .command('shape')
+    .description(
+      'Interactive 4-question SPEC authoring (Context, Functional Requirements, Business Rules, Acceptance Criteria)',
+    )
+    .argument('<specId>', 'spec ID (e.g., SPEC-001)')
+    .action(async (specId: string) => {
+      const projectDir = program.opts().projectDir as string;
+      const config = await loadConfig(projectDir);
+
+      // shape is interactive by definition. If the user is in --no-interactive
+      // mode, refuse with a helpful message. (Same pattern as `--manual`
+      // in `planr quick create` — see requireInteractiveForManual.)
+      requireInteractiveForManual(true);
+
+      const spec = await readSpec(projectDir, config, specId);
+      if (!spec) {
+        logger.error(`Spec ${specId} not found.`);
+        process.exit(1);
+      }
+
+      logger.heading(`Shape ${spec.id}: ${spec.data.title || spec.slug}`);
+      logger.dim('4 questions. Answers populate the spec body.');
+      logger.dim('Press Ctrl+C at any time to abort without saving.');
+      logger.dim('');
+
+      // ── Question 1 — Context ────────────────────────────────────────────
+      logger.dim('Question 1 of 4 — Context');
+      const context = await promptEditor(
+        'What problem does this feature solve? Who is the primary user? (opens your $EDITOR)',
+        '',
+      );
+      if (!context.trim()) {
+        logger.error('Context cannot be empty. Aborting.');
+        process.exit(1);
+      }
+
+      // ── Question 2 — Functional requirements ────────────────────────────
+      logger.dim('');
+      logger.dim('Question 2 of 4 — Functional Requirements');
+      const functionalRequirements = await promptMultiText(
+        'What must the system DO? (comma-separated; one observable behavior per item)',
+        'e.g., "user can log in", "system validates password complexity", "session expires after 30min"',
+      );
+      if (functionalRequirements.length === 0) {
+        logger.error('At least one functional requirement is required. Aborting.');
+        process.exit(1);
+      }
+
+      // ── Question 3 — Business rules / constraints ───────────────────────
+      logger.dim('');
+      logger.dim('Question 3 of 4 — Business Rules & Constraints (optional)');
+      const businessRules = await promptEditor(
+        'Any rules, limits, or constraints? (permissions, validations, dependencies — leave empty if none)',
+        '',
+      );
+
+      // ── Question 4 — Acceptance criteria ────────────────────────────────
+      logger.dim('');
+      logger.dim('Question 4 of 4 — Acceptance Criteria');
+      const acceptanceCriteria = await promptMultiText(
+        'How will you know this feature is done? (Given/When/Then format recommended; comma-separated)',
+        'e.g., "Given a logged-out user, when they submit valid creds, then they reach /dashboard"',
+      );
+      if (acceptanceCriteria.length === 0) {
+        logger.error('At least one acceptance criterion is required. Aborting.');
+        process.exit(1);
+      }
+
+      // ── Optional: out-of-scope items + decomposition notes ──────────────
+      logger.dim('');
+      const wantExtras = await promptConfirm(
+        'Add Out-of-Scope items or Notes for Decomposition? (optional)',
+        false,
+      );
+      let outOfScope: string[] = [];
+      let decompositionNotes = '';
+      if (wantExtras) {
+        outOfScope = await promptMultiText(
+          'Out of Scope (comma-separated; what this feature does NOT include)',
+          'e.g., "email notifications (covered in feat-notifications)"',
+        );
+        decompositionNotes = await promptEditor(
+          'Notes for `planr spec decompose` (hints to guide the AI; not business requirements)',
+          '',
+        );
+      }
+
+      // ── Confirm + write ─────────────────────────────────────────────────
+      logger.dim('');
+      const ok = await promptConfirm(`Update ${spec.id} body with these answers?`, true);
+      if (!ok) {
+        logger.info('Cancelled.');
+        return;
+      }
+
+      const answers: ShapeSpecAnswers = {
+        context,
+        functionalRequirements,
+        businessRules,
+        outOfScope,
+        acceptanceCriteria,
+        decompositionNotes,
+      };
+
+      try {
+        const { specFile } = await shapeSpec(projectDir, config, specId, answers);
+        logger.success(`Shaped ${spec.id}.`);
+        logger.dim(`  ${specFile}`);
+        logger.dim(`  Status: pending → shaping`);
+        logger.dim('');
+        display.line('Next steps:');
+        display.line(`  - Review the spec:           planr spec show ${spec.id}`);
+        display.line(`  - Decompose into US + Tasks: planr spec decompose ${spec.id}  (AI-driven)`);
       } catch (err) {
         logger.error((err as Error).message);
         process.exit(1);
