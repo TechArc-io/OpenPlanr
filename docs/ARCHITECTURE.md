@@ -100,8 +100,21 @@ Artifacts link to each other via markdown:
 IDs follow the pattern `PREFIX-NNN` (e.g., EPIC-001, FEAT-002).
 
 - `getNextId()` scans existing files and finds the first available gap
-- IDs are global per artifact type (not scoped to parent)
+- IDs are global per artifact type (not scoped to parent) — **except spec-driven mode**:
+  in spec-driven mode, US-NNN and T-NNN IDs are **scoped to the parent spec**
+  (so two specs can each have their own US-001). See `docs/proposals/spec-driven-mode.md`.
 - Configurable prefixes via `.planr/config.json` → `idPrefix`
+
+## Spec-Driven Mode (third planning posture)
+
+Alongside the agile (epic/feature/story/task) and QT modes, planr supports a **spec-driven** mode optimized for planning *for* AI coding agents to execute.
+
+- **Service:** `src/services/spec-service.ts` — directory-aware CRUD (specs are nested directories, not flat files)
+- **Layout:** `.planr/specs/SPEC-NNN-{slug}/{SPEC-NNN-{slug}.md, design/, stories/US-NNN-*.md, tasks/T-NNN-*.md}`
+- **Schema:** matches the [`openplanr-pipeline`](https://github.com/openplanr/openplanr-pipeline) Claude Code plugin verbatim (file Create/Modify/Preserve lists, Type=UI|Tech, agent assignment, DoD with build/test commands)
+- **Bridge:** `planr spec promote` validates + prints `/openplanr-pipeline:plan {slug}` for execution. The pipeline plugin reads `.planr/specs/` directly when spec mode is active — no conversion adapter.
+
+See `docs/proposals/spec-driven-mode.md` for the full design.
 
 ## Template System
 

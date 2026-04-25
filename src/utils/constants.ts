@@ -43,6 +43,35 @@ export const VALID_STATUSES: Partial<Record<ArtifactType, readonly string[]>> = 
   sprint: ['planning', 'active', 'completed'],
 };
 
+/**
+ * Spec-driven mode (third planning posture) uses a richer status lifecycle
+ * because each phase corresponds to a different role transition:
+ * PO authoring → AI decomposition → human review → handoff to openplanr-pipeline.
+ *
+ * - pending             — SPEC created, body not yet written
+ * - shaping             — SPEC body authored (manually or via `planr spec shape`)
+ * - decomposing         — `planr spec decompose` is running (AI generating US + tasks)
+ * - decomposed          — US + Task files written, awaiting human review
+ * - ready-for-pipeline  — `planr spec promote` validated; ready for openplanr-pipeline
+ * - in-pipeline         — openplanr-pipeline `/plan` or `/ship` is running
+ * - done                — DEV phase complete, code shipped
+ */
+export const VALID_SPEC_STATUSES = [
+  'pending',
+  'shaping',
+  'decomposing',
+  'decomposed',
+  'ready-for-pipeline',
+  'in-pipeline',
+  'done',
+] as const;
+
+export type SpecStatus = (typeof VALID_SPEC_STATUSES)[number];
+
+/** US/Task statuses inside a spec — simpler than the SPEC lifecycle. */
+export const VALID_SPEC_STORY_STATUSES = ['pending', 'implementing', 'done', 'blocked'] as const;
+export const VALID_SPEC_TASK_STATUSES = ['pending', 'in-progress', 'done', 'blocked'] as const;
+
 export function getTemplatesDir(): string {
   return path.resolve(__dirname, '..', 'templates');
 }

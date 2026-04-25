@@ -144,6 +144,29 @@ planr rules generate --dry-run        # preview
 | `planr template save TASK-001 --name my-pattern`      | Save existing tasks as template    |
 | `planr template show rest-endpoint`                   | Preview template contents          |
 
+### Spec-Driven Mode (planning *for* AI agents)
+
+Third planning posture alongside agile + QT. Specs decompose into User Stories
+and Tasks with the **same artifact contract as the
+[openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline)** Claude
+Code plugin — file Create/Modify/Preserve lists, Type=UI|Tech, agent
+assignment, DoD with build/test commands. Plan in `planr`, ship in the pipeline.
+See [`docs/proposals/spec-driven-mode.md`](docs/proposals/spec-driven-mode.md).
+
+| Command                                                 | Description                                       |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| `planr spec init`                                       | Activate spec-driven mode (creates `.planr/specs/`) |
+| `planr spec create "Auth flow"`                         | Create a self-contained `SPEC-NNN-{slug}/` directory |
+| `planr spec shape <SPEC-id>`                            | Interactive 4-question authoring (Context, Functional Reqs, Business Rules, Acceptance) |
+| `planr spec decompose <SPEC-id>`                        | AI-driven decomposition into User Stories + Tasks (matches openplanr-pipeline schema) |
+| `planr spec sync [<SPEC-id>]`                           | Validate integrity (orphaned tasks, missing `specId`, schema drift); auto-fixes safe issues |
+| `planr spec list`                                       | List all specs with status + decomposition counts |
+| `planr spec show <SPEC-id>`                             | Print a spec + its US/Task tree                   |
+| `planr spec status [<SPEC-id>]`                         | Decomposition state across one/all specs         |
+| `planr spec destroy <SPEC-id>`                          | Remove a spec entirely (clean `rm -rf`)           |
+| `planr spec attach-design <SPEC-id> --files <png>...`   | Attach UI mockups for the pipeline's designer-agent |
+| `planr spec promote <SPEC-id>`                          | Validate + print the `/openplanr-pipeline:plan {slug}` handoff |
+
 ### Planning Tools
 
 | Command                | Description                                               |

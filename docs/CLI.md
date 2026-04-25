@@ -542,6 +542,188 @@ planr quick promote QT-001 --feature FEAT-001
 
 ---
 
+### `planr spec`
+
+Spec-driven planning mode — third posture alongside agile + QT, designed for **planning *for* AI coding agents**. Each spec is a self-contained directory at `.planr/specs/SPEC-NNN-{slug}/` containing the spec doc, decomposed User Stories, decomposed Tasks, and any UI design assets. The artifact schema **matches the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) Claude Code plugin verbatim** — file Create/Modify/Preserve lists, Type=UI|Tech, agent assignment, DoD with build/test commands. The two products share one schema; no conversion adapter ever.
+
+See [`docs/proposals/spec-driven-mode.md`](proposals/spec-driven-mode.md) for the full design.
+
+#### `planr spec init`
+
+Activate spec-driven mode in the current project. Creates `.planr/specs/`. Adds `spec: SPEC` to `idPrefix` if missing. Idempotent.
+
+```bash
+planr spec init
+```
+
+---
+
+#### `planr spec create`
+
+Create a new spec — a self-contained directory with `stories/`, `tasks/`, `design/` subfolders.
+
+```bash
+planr spec create "Auth flow"
+planr spec create --title "Auth flow" --slug auth --priority P0 --milestone v1.0
+planr spec create "User Onboarding" --po @AsemDevs
+```
+
+| Option              | Description                                            | Required     |
+| ------------------- | ------------------------------------------------------ | ------------ |
+| `<title>` (positional) | Spec title (alternative to `--title`)               | No (one of `<title>` or `--title`) |
+| `--title <str>`     | Spec title                                             | No           |
+| `--slug <slug>`     | Explicit kebab-case slug; otherwise derived from title | No           |
+| `--priority <p>`    | `P0` / `P1` / `P2` (default: `P1`)                     | No           |
+| `--milestone <m>`   | Milestone label (e.g., `v1.0`)                         | No           |
+| `--po <handle>`     | Product Owner handle                                   | No           |
+
+**Output:** `.planr/specs/SPEC-NNN-{slug}/SPEC-NNN-{slug}.md` (plus empty `stories/`, `tasks/`, `design/` subdirs).
+
+---
+
+#### `planr spec shape`
+
+Interactive 4-question authoring of a spec's body. Walks the PO through Context, Functional Requirements, Business Rules, and Acceptance Criteria. Optionally captures Out-of-Scope items and Decomposition Notes. Updates `status: pending → shaping`.
+
+```bash
+planr spec shape SPEC-001
+```
+
+**Refused in `--no-interactive` mode** — this command is interactive by design (it asks 4 sequential questions).
+
+| Behavior | Detail |
+| --- | --- |
+| Question 1 | Context (opens your `$EDITOR`) |
+| Question 2 | Functional Requirements (comma-separated) |
+| Question 3 | Business Rules / Constraints (optional, opens `$EDITOR`) |
+| Question 4 | Acceptance Criteria (comma-separated) |
+| Optional | Out-of-Scope items + Decomposition Notes |
+| Output | Regenerates `SPEC-NNN-{slug}.md` body from answers; preserves frontmatter (priority, milestone, po, ui_files) |
+
+---
+
+#### `planr spec decompose`
+
+AI-driven decomposition of a spec into User Stories and Tasks matching the openplanr-pipeline schema (file Create/Modify/Preserve lists, Type=UI|Tech, agent assignment). The heart of spec-driven mode.
+
+```bash
+planr spec decompose SPEC-001
+planr spec decompose SPEC-001 --no-code-context     # skip codebase scan, faster
+planr spec decompose SPEC-001 --max-stories 4       # cap at 4 stories
+planr spec decompose SPEC-001 --force               # overwrite existing decomposition
+```
+
+| Option              | Description                                                            | Required |
+| ------------------- | ---------------------------------------------------------------------- | -------- |
+| `<specId>`          | Spec ID (e.g., `SPEC-001`)                                             | **Yes**  |
+| `--force`           | Overwrite existing US/Task files (default: refuse if any exist)        | No       |
+| `--no-code-context` | Skip the codebase scanner (tasks reference generic paths the user must edit) | No       |
+| `--max-stories <n>` | Cap the number of stories the AI emits (1-8)                          | No       |
+
+**Behavior:**
+- Always scans the codebase via the existing `buildCodebaseContext()` so generated tasks reference real file paths matching your stack
+- Reads `input/tech/stack.md` (best-effort) for stack-specific hints
+- Detects `ui_files` in SPEC frontmatter — emits 2 tasks per US (UI + Tech) when PNGs are attached, otherwise 1 task per US (Tech) per openplanr-pipeline rule R2
+- Status: `pending|shaping → decomposing → decomposed`
+- Refuses to overwrite existing US/Task files unless `--force` is passed (matches `planr quick create` UX)
+- Validates AI output via Zod schema (rejects malformed responses; surfaces clear validation errors)
+
+Works with all three AI providers (Anthropic, OpenAI, Ollama) via planr's existing `AIProvider` abstraction.
+
+**Output:** populates `.planr/specs/SPEC-NNN-{slug}/{stories,tasks}/` with the generated artifacts.
+
+---
+
+#### `planr spec sync`
+
+Validate spec integrity and auto-fix safe inconsistencies. Use after manual edits, after a failed `decompose`, or when in doubt.
+
+```bash
+planr spec sync                       # scan all specs
+planr spec sync SPEC-001              # scope to one spec
+planr spec sync --dry-run             # report findings without writing fixes
+```
+
+| Option        | Description                                          | Required |
+| ------------- | ---------------------------------------------------- | -------- |
+| `[specId]`    | Optional spec ID to scope; default: scan all         | No       |
+| `--dry-run`   | Report findings without writing fixes                | No       |
+
+**Detection rules:**
+1. **Orphaned task** — `task.storyId` points to a non-existent US in the same spec → WARN (don't auto-delete; user reviews)
+2. **Story without tasks** — decomposition incomplete → WARN
+3. **Missing `specId` frontmatter** on US/Task files → AUTO-FIX (insert from path)
+4. **Schema version drift** — artifact's `schemaVersion` older than current → WARN (no auto-migration in v1)
+
+---
+
+#### `planr spec list`
+
+List all specs with title, status, and decomposition counts.
+
+```bash
+planr spec list
+```
+
+---
+
+#### `planr spec show`
+
+Print a spec's metadata, body summary, and the full US/Task decomposition tree.
+
+```bash
+planr spec show SPEC-001
+```
+
+---
+
+#### `planr spec status`
+
+Decomposition state. Without args: aggregate report across all specs. With a spec ID: focused view.
+
+```bash
+planr spec status                # aggregate
+planr spec status SPEC-001       # focused
+```
+
+---
+
+#### `planr spec destroy`
+
+Remove a spec entirely. Because each spec is a self-contained directory, this is a single `rm -rf`. Prompts for confirmation (use `--yes` to skip).
+
+```bash
+planr spec destroy SPEC-001
+planr spec destroy SPEC-001 --yes
+```
+
+---
+
+#### `planr spec attach-design`
+
+Copy PNG mockup files into the spec's `design/` subdirectory and update `ui_files` frontmatter on the SPEC. The `openplanr-pipeline` `designer-agent` reads these PNGs to generate `design/design-spec.md` when `/openplanr-pipeline:plan` runs.
+
+```bash
+planr spec attach-design SPEC-001 --files login.png signup.png
+```
+
+---
+
+#### `planr spec promote`
+
+Validate that a spec is ready for handoff to `openplanr-pipeline` (has stories, tasks, non-trivial body) and print the next-step pipeline command. Updates SPEC frontmatter `status: ready-for-pipeline`.
+
+```bash
+planr spec promote SPEC-001
+```
+
+After promotion, run from Claude Code:
+```
+/openplanr-pipeline:plan {slug}
+```
+
+---
+
 ### `planr template list`
 
 List all available task templates (built-in and custom).

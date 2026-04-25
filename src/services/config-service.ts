@@ -71,6 +71,7 @@ export function createDefaultConfig(projectName: string): OpenPlanrConfig {
       quick: 'QT',
       backlog: 'BL',
       sprint: 'SPRINT',
+      spec: 'SPEC',
     },
     createdAt: new Date().toISOString().split('T')[0],
   };
