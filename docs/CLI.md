@@ -542,6 +542,112 @@ planr quick promote QT-001 --feature FEAT-001
 
 ---
 
+### `planr spec`
+
+Spec-driven planning mode — third posture alongside agile + QT, designed for **planning *for* AI coding agents**. Each spec is a self-contained directory at `.planr/specs/SPEC-NNN-{slug}/` containing the spec doc, decomposed User Stories, decomposed Tasks, and any UI design assets. The artifact schema **matches the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) Claude Code plugin verbatim** — file Create/Modify/Preserve lists, Type=UI|Tech, agent assignment, DoD with build/test commands. The two products share one schema; no conversion adapter ever.
+
+See [`docs/proposals/spec-driven-mode.md`](proposals/spec-driven-mode.md) for the full design.
+
+#### `planr spec init`
+
+Activate spec-driven mode in the current project. Creates `.planr/specs/`. Adds `spec: SPEC` to `idPrefix` if missing. Idempotent.
+
+```bash
+planr spec init
+```
+
+---
+
+#### `planr spec create`
+
+Create a new spec — a self-contained directory with `stories/`, `tasks/`, `design/` subfolders.
+
+```bash
+planr spec create "Auth flow"
+planr spec create --title "Auth flow" --slug auth --priority P0 --milestone v1.0
+planr spec create "User Onboarding" --po @AsemDevs
+```
+
+| Option              | Description                                            | Required     |
+| ------------------- | ------------------------------------------------------ | ------------ |
+| `<title>` (positional) | Spec title (alternative to `--title`)               | No (one of `<title>` or `--title`) |
+| `--title <str>`     | Spec title                                             | No           |
+| `--slug <slug>`     | Explicit kebab-case slug; otherwise derived from title | No           |
+| `--priority <p>`    | `P0` / `P1` / `P2` (default: `P1`)                     | No           |
+| `--milestone <m>`   | Milestone label (e.g., `v1.0`)                         | No           |
+| `--po <handle>`     | Product Owner handle                                   | No           |
+
+**Output:** `.planr/specs/SPEC-NNN-{slug}/SPEC-NNN-{slug}.md` (plus empty `stories/`, `tasks/`, `design/` subdirs).
+
+---
+
+#### `planr spec list`
+
+List all specs with title, status, and decomposition counts.
+
+```bash
+planr spec list
+```
+
+---
+
+#### `planr spec show`
+
+Print a spec's metadata, body summary, and the full US/Task decomposition tree.
+
+```bash
+planr spec show SPEC-001
+```
+
+---
+
+#### `planr spec status`
+
+Decomposition state. Without args: aggregate report across all specs. With a spec ID: focused view.
+
+```bash
+planr spec status                # aggregate
+planr spec status SPEC-001       # focused
+```
+
+---
+
+#### `planr spec destroy`
+
+Remove a spec entirely. Because each spec is a self-contained directory, this is a single `rm -rf`. Prompts for confirmation (use `--yes` to skip).
+
+```bash
+planr spec destroy SPEC-001
+planr spec destroy SPEC-001 --yes
+```
+
+---
+
+#### `planr spec attach-design`
+
+Copy PNG mockup files into the spec's `design/` subdirectory and update `ui_files` frontmatter on the SPEC. The `openplanr-pipeline` `designer-agent` reads these PNGs to generate `design/design-spec.md` when `/openplanr-pipeline:plan` runs.
+
+```bash
+planr spec attach-design SPEC-001 --files login.png signup.png
+```
+
+---
+
+#### `planr spec promote`
+
+Validate that a spec is ready for handoff to `openplanr-pipeline` (has stories, tasks, non-trivial body) and print the next-step pipeline command. Updates SPEC frontmatter `status: ready-for-pipeline`.
+
+```bash
+planr spec promote SPEC-001
+```
+
+After promotion, run from Claude Code:
+```
+/openplanr-pipeline:plan {slug}
+```
+
+---
+
 ### `planr template list`
 
 List all available task templates (built-in and custom).

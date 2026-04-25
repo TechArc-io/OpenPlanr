@@ -114,6 +114,7 @@ export const configSchema = z.object({
     quick: z.string().default('QT'),
     backlog: z.string().default('BL'),
     sprint: z.string().default('SPRINT'),
+    spec: z.string().default('SPEC'),
   }),
   ai: aiConfigSchema.optional(),
   defaultAgent: codingAgentSchema.optional(),

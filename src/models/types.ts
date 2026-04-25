@@ -142,6 +142,15 @@ export interface OpenPlanrConfig {
     quick: string;
     backlog: string;
     sprint: string;
+    /**
+     * Spec-driven mode (third planning posture alongside agile + QT).
+     * Specs decompose into nested User Stories and Tasks with rich
+     * agent-execution contracts (file Create/Modify/Preserve lists,
+     * Type=UI|Tech, agent assignment, build/test DoD). See
+     * `docs/proposals/spec-driven-mode.md` and
+     * https://github.com/openplanr/openplanr-pipeline for the schema.
+     */
+    spec: string;
   };
   ai?: AIConfig;
   defaultAgent?: CodingAgentName;

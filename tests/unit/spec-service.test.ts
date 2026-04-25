@@ -1,0 +1,476 @@
+/**
+ * Tests for spec-service — directory-aware CRUD for spec-driven planning mode.
+ *
+ * Uses a real temporary directory rather than mocks because spec-service
+ * operates on real directory structures (mkdir, copyFile, recursive rm)
+ * that are clumsy to mock fully. Each test gets its own tmpdir, populated
+ * just-in-time, then cleaned up.
+ */
+
+import { existsSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { OpenPlanrConfig } from '../../src/models/types.js';
+import {
+  attachSpecDesigns,
+  createSpec,
+  createSpecStory,
+  createSpecTask,
+  destroySpec,
+  getSpecDir,
+  getSpecStatus,
+  getSpecsRootDir,
+  listSpecStories,
+  listSpecs,
+  listSpecTasks,
+  readSpec,
+  resolveSpecDir,
+  validateSpecForPromotion,
+} from '../../src/services/spec-service.js';
+
+// Test fixture: minimal valid OpenPlanrConfig.
+function makeConfig(projectDir: string): OpenPlanrConfig {
+  return {
+    projectName: 'test-project',
+    targets: ['claude'],
+    outputPaths: {
+      agile: '.planr',
+      cursorRules: '.cursor/rules',
+      claudeConfig: '.',
+      codexConfig: '.',
+    },
+    idPrefix: {
+      epic: 'EPIC',
+      feature: 'FEAT',
+      story: 'US',
+      task: 'TASK',
+      quick: 'QT',
+      backlog: 'BL',
+      sprint: 'SPRINT',
+      spec: 'SPEC',
+    },
+    createdAt: '2026-04-25',
+  };
+}
+
+let projectDir: string;
+let config: OpenPlanrConfig;
+
+beforeEach(async () => {
+  projectDir = await fs.mkdtemp(path.join(tmpdir(), 'planr-spec-test-'));
+  config = makeConfig(projectDir);
+  await fs.mkdir(path.join(projectDir, '.planr'), { recursive: true });
+});
+
+afterEach(async () => {
+  if (projectDir && existsSync(projectDir)) {
+    await fs.rm(projectDir, { recursive: true, force: true });
+  }
+});
+
+describe('createSpec', () => {
+  it('creates SPEC-001 with self-contained directory layout', async () => {
+    const result = await createSpec(projectDir, config, 'User Authentication');
+
+    expect(result.id).toBe('SPEC-001');
+    expect(result.slug).toBe('user-authentication');
+
+    const expectedDir = path.join(projectDir, '.planr/specs/SPEC-001-user-authentication');
+    expect(result.specDir).toBe(expectedDir);
+
+    // Directory + subdirectories exist
+    expect(existsSync(expectedDir)).toBe(true);
+    expect(existsSync(path.join(expectedDir, 'design'))).toBe(true);
+    expect(existsSync(path.join(expectedDir, 'stories'))).toBe(true);
+    expect(existsSync(path.join(expectedDir, 'tasks'))).toBe(true);
+
+    // Spec file written
+    const specFile = path.join(expectedDir, 'SPEC-001-user-authentication.md');
+    expect(existsSync(specFile)).toBe(true);
+    const content = await fs.readFile(specFile, 'utf-8');
+    expect(content).toContain('id: "SPEC-001"');
+    expect(content).toContain('title: "User Authentication"');
+    expect(content).toContain('schemaVersion: "1.0.0"');
+    expect(content).toContain('# SPEC-001: User Authentication');
+  });
+
+  it('assigns sequential IDs across multiple specs', async () => {
+    const a = await createSpec(projectDir, config, 'Auth Flow');
+    const b = await createSpec(projectDir, config, 'Checkout');
+    expect(a.id).toBe('SPEC-001');
+    expect(b.id).toBe('SPEC-002');
+  });
+
+  it('respects --slug override', async () => {
+    const result = await createSpec(projectDir, config, 'User Authentication Flow', {
+      slug: 'auth',
+    });
+    expect(result.slug).toBe('auth');
+    expect(result.specDir.endsWith('SPEC-001-auth')).toBe(true);
+  });
+
+  it('refuses to overwrite an existing spec directory', async () => {
+    await createSpec(projectDir, config, 'Auth', { slug: 'auth' });
+    // Manually pre-create SPEC-002-auth to force collision
+    await fs.mkdir(path.join(projectDir, '.planr/specs/SPEC-002-auth'), { recursive: true });
+    await expect(createSpec(projectDir, config, 'Auth Again', { slug: 'auth' })).rejects.toThrow(
+      /already exists/,
+    );
+  });
+
+  it('writes priority and milestone into frontmatter', async () => {
+    const { specFile } = await createSpec(projectDir, config, 'Auth', {
+      priority: 'P0',
+      milestone: 'v1.0',
+      po: '@AsemDevs',
+    });
+    const content = await fs.readFile(specFile, 'utf-8');
+    expect(content).toContain('priority: "P0"');
+    expect(content).toContain('milestone: "v1.0"');
+    expect(content).toContain('po: "@AsemDevs"');
+  });
+});
+
+describe('listSpecs', () => {
+  it('returns empty array when no specs exist', async () => {
+    const result = await listSpecs(projectDir, config);
+    expect(result).toEqual([]);
+  });
+
+  it('lists every spec with title, status, and counts', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpec(projectDir, config, 'Checkout');
+
+    const result = await listSpecs(projectDir, config);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('SPEC-001');
+    expect(result[0].title).toBe('Auth');
+    expect(result[0].status).toBe('pending');
+    expect(result[0].storyCount).toBe(0);
+    expect(result[0].taskCount).toBe(0);
+    expect(result[1].id).toBe('SPEC-002');
+    expect(result[1].title).toBe('Checkout');
+  });
+
+  it('sorts by ID', async () => {
+    // Create out of order by manually manipulating
+    await createSpec(projectDir, config, 'Checkout');
+    await createSpec(projectDir, config, 'Auth');
+    const result = await listSpecs(projectDir, config);
+    expect(result.map((s) => s.id)).toEqual(['SPEC-001', 'SPEC-002']);
+  });
+});
+
+describe('readSpec', () => {
+  it('returns null for unknown spec ID', async () => {
+    const result = await readSpec(projectDir, config, 'SPEC-999');
+    expect(result).toBeNull();
+  });
+
+  it('reads frontmatter and body of an existing spec', async () => {
+    await createSpec(projectDir, config, 'Auth Flow');
+    const result = await readSpec(projectDir, config, 'SPEC-001');
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe('SPEC-001');
+    expect(result?.slug).toBe('auth-flow');
+    expect(result?.data.title).toBe('Auth Flow');
+    expect(result?.data.status).toBe('pending');
+    expect(result?.content).toContain('Context & Goal');
+  });
+});
+
+describe('resolveSpecDir', () => {
+  it('resolves SPEC-001 → its on-disk directory', async () => {
+    const created = await createSpec(projectDir, config, 'Auth');
+    const resolved = await resolveSpecDir(projectDir, config, 'SPEC-001');
+    expect(resolved).not.toBeNull();
+    expect(resolved?.dir).toBe(created.specDir);
+    expect(resolved?.slug).toBe('auth');
+  });
+
+  it('returns null for unknown ID', async () => {
+    const resolved = await resolveSpecDir(projectDir, config, 'SPEC-999');
+    expect(resolved).toBeNull();
+  });
+
+  it('handles SPEC- prefix collision safely (does not match SPEC-0011 when looking for SPEC-001)', async () => {
+    // Create SPEC-001-real and a fake SPEC-0011 (which shouldn't match)
+    await createSpec(projectDir, config, 'Real');
+    await fs.mkdir(path.join(projectDir, '.planr/specs/SPEC-0011-fake'), { recursive: true });
+    const resolved = await resolveSpecDir(projectDir, config, 'SPEC-001');
+    expect(resolved?.slug).toBe('real');
+  });
+});
+
+describe('createSpecStory', () => {
+  it("writes a US-NNN file inside the spec's stories/ subdirectory", async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const result = await createSpecStory(projectDir, config, 'SPEC-001', 'Login Form', {
+      roleAction: 'a registered user, I want to log in',
+      benefit: 'I can access my account',
+    });
+    expect(result.id).toBe('US-001');
+    expect(result.slug).toBe('login-form');
+    expect(existsSync(result.filePath)).toBe(true);
+
+    const content = await fs.readFile(result.filePath, 'utf-8');
+    expect(content).toContain('id: "US-001"');
+    expect(content).toContain('specId: "SPEC-001"');
+    expect(content).toContain('a registered user, I want to log in');
+    expect(content).toContain('I can access my account');
+  });
+
+  it('scopes US IDs per spec — two specs each get their own US-001', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpec(projectDir, config, 'Checkout');
+
+    const a = await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+    const b = await createSpecStory(projectDir, config, 'SPEC-002', 'Cart', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+
+    expect(a.id).toBe('US-001');
+    expect(b.id).toBe('US-001'); // Each spec has its own US-001
+    expect(a.filePath).not.toBe(b.filePath);
+  });
+});
+
+describe('createSpecTask', () => {
+  it('writes a T-NNN file with file lists in frontmatter and body', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+
+    const result = await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-001',
+      title: 'Login Form Component',
+      type: 'UI',
+      agent: 'frontend-agent',
+      filesCreate: ['src/features/auth/components/LoginForm.tsx'],
+      filesModify: ['src/app/layout.tsx'],
+      filesPreserve: ['src/lib/auth/legacy.ts'],
+    });
+
+    expect(result.id).toBe('T-001');
+    const content = await fs.readFile(result.filePath, 'utf-8');
+    expect(content).toContain('id: "T-001"');
+    expect(content).toContain('storyId: "US-001"');
+    expect(content).toContain('specId: "SPEC-001"');
+    expect(content).toContain('type: "UI"');
+    expect(content).toContain('agent: "frontend-agent"');
+    expect(content).toContain('src/features/auth/components/LoginForm.tsx');
+    expect(content).toContain('src/app/layout.tsx');
+    expect(content).toContain('src/lib/auth/legacy.ts');
+  });
+
+  it('scopes T IDs per spec', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpec(projectDir, config, 'Checkout');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+    await createSpecStory(projectDir, config, 'SPEC-002', 'Cart', {
+      roleAction: 'user',
+      benefit: 'reason',
+    });
+
+    const a = await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-001',
+      title: 'Form',
+      type: 'UI',
+      agent: 'frontend-agent',
+    });
+    const b = await createSpecTask(projectDir, config, 'SPEC-002', {
+      storyId: 'US-001',
+      title: 'Cart Service',
+      type: 'Tech',
+      agent: 'backend-agent',
+    });
+
+    expect(a.id).toBe('T-001');
+    expect(b.id).toBe('T-001'); // Per-spec scoping
+  });
+});
+
+describe('listSpecStories / listSpecTasks', () => {
+  it('returns stories sorted by ID with title and status', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Logout', {
+      roleAction: 'user',
+      benefit: 'sign out',
+    });
+
+    const specDir = getSpecDir(projectDir, config, 'SPEC-001', 'auth');
+    const stories = await listSpecStories(specDir);
+    expect(stories).toHaveLength(2);
+    expect(stories[0].id).toBe('US-001');
+    expect(stories[0].title).toBe('Login');
+    expect(stories[1].id).toBe('US-002');
+    expect(stories[1].title).toBe('Logout');
+  });
+
+  it('returns empty array for spec with no stories yet', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const specDir = getSpecDir(projectDir, config, 'SPEC-001', 'auth');
+    expect(await listSpecStories(specDir)).toEqual([]);
+    expect(await listSpecTasks(specDir)).toEqual([]);
+  });
+});
+
+describe('attachSpecDesigns', () => {
+  it('copies PNG files into design/ and updates ui_files frontmatter', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    // Create a fake PNG to attach
+    const fakePng = path.join(projectDir, 'mockup.png');
+    await fs.writeFile(fakePng, 'fake-png-data');
+
+    const result = await attachSpecDesigns(projectDir, config, 'SPEC-001', [fakePng]);
+    expect(result.copied).toEqual(['mockup.png']);
+
+    const dest = path.join(result.designDir, 'mockup.png');
+    expect(existsSync(dest)).toBe(true);
+
+    // Verify ui_files frontmatter updated
+    const spec = await readSpec(projectDir, config, 'SPEC-001');
+    expect(spec?.data.ui_files).toContain('design/mockup.png');
+  });
+
+  it('skips non-PNG files with warning', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const fakeFile = path.join(projectDir, 'notes.txt');
+    await fs.writeFile(fakeFile, 'data');
+
+    const result = await attachSpecDesigns(projectDir, config, 'SPEC-001', [fakeFile]);
+    expect(result.copied).toEqual([]);
+  });
+});
+
+describe('destroySpec', () => {
+  it('removes the spec directory and all its contents', async () => {
+    const { specDir } = await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    expect(existsSync(specDir)).toBe(true);
+
+    await destroySpec(projectDir, config, 'SPEC-001');
+    expect(existsSync(specDir)).toBe(false);
+  });
+
+  it('throws on unknown spec ID', async () => {
+    await expect(destroySpec(projectDir, config, 'SPEC-999')).rejects.toThrow(/not found/);
+  });
+});
+
+describe('getSpecStatus', () => {
+  it('aggregates counts across all specs', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpec(projectDir, config, 'Checkout');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-001',
+      title: 'Form',
+      type: 'UI',
+      agent: 'frontend-agent',
+    });
+
+    const report = await getSpecStatus(projectDir, config);
+    expect(report.specCount).toBe(2);
+    expect(report.totalStories).toBe(1);
+    expect(report.totalTasks).toBe(1);
+  });
+});
+
+describe('validateSpecForPromotion', () => {
+  it('flags missing stories and tasks', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    const result = await validateSpecForPromotion(projectDir, config, 'SPEC-001');
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((i) => i.includes('No User Stories'))).toBe(true);
+    expect(result.issues.some((i) => i.includes('No Tasks'))).toBe(true);
+  });
+
+  it('flags story without tasks', async () => {
+    await createSpec(projectDir, config, 'Auth');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    // Create a task linked to a different (non-existent) story to force the
+    // "story without tasks" branch
+    await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-999',
+      title: 'Stray',
+      type: 'Tech',
+      agent: 'backend-agent',
+    });
+    const result = await validateSpecForPromotion(projectDir, config, 'SPEC-001');
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((i) => i.includes('US-001 has no tasks'))).toBe(true);
+  });
+
+  it('returns ready=true when stories + tasks line up', async () => {
+    await createSpec(projectDir, config, 'Auth Flow with a Sufficiently Detailed Title');
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-001',
+      title: 'Form',
+      type: 'UI',
+      agent: 'frontend-agent',
+    });
+    const result = await validateSpecForPromotion(projectDir, config, 'SPEC-001');
+    expect(result.ready).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('flags spec with empty body', async () => {
+    await createSpec(projectDir, config, 'A'); // very short title → short body
+    // Manually overwrite body with nothing
+    const { updateSpec } = await import('../../src/services/spec-service.js');
+    await updateSpec(
+      projectDir,
+      config,
+      'SPEC-001',
+      `---\nid: "SPEC-001"\ntitle: "A"\nslug: "a"\nschemaVersion: "1.0.0"\nstatus: "pending"\npriority: "P1"\ncreated: "2026-04-25"\nupdated: "2026-04-25"\nui_files: []\ntech_dependencies: []\n---\n\nshort\n`,
+    );
+    await createSpecStory(projectDir, config, 'SPEC-001', 'Login', {
+      roleAction: 'user',
+      benefit: 'access',
+    });
+    await createSpecTask(projectDir, config, 'SPEC-001', {
+      storyId: 'US-001',
+      title: 'Form',
+      type: 'UI',
+      agent: 'frontend-agent',
+    });
+    const result = await validateSpecForPromotion(projectDir, config, 'SPEC-001');
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((i) => i.includes('very short'))).toBe(true);
+  });
+});
+
+describe('path resolvers', () => {
+  it('getSpecsRootDir = .planr/specs/', () => {
+    expect(getSpecsRootDir(projectDir, config)).toBe(path.join(projectDir, '.planr/specs'));
+  });
+});
