@@ -9,6 +9,17 @@ export type ArtifactType =
   | 'adr'
   | 'checklist';
 export type TargetCLI = 'cursor' | 'claude' | 'codex';
+/**
+ * Which set of rule files `planr rules generate` should produce:
+ *
+ *  - `agile`    — the existing agile-mode templates (epic → feature → story → task,
+ *                 sprint, backlog). Default; preserves byte-for-byte legacy output.
+ *  - `pipeline` — additional rule files that drive the openplanr-pipeline two-phase
+ *                 spec-driven flow (`/openplanr-pipeline:plan`, `/openplanr-pipeline:ship`)
+ *                 on the chosen runtime. Cross-runtime parity with the Claude Code plugin.
+ *  - `all`      — both sets, side-by-side.
+ */
+export type GenerationScope = 'agile' | 'pipeline' | 'all';
 export type TaskStatus = 'pending' | 'in-progress' | 'done';
 export type AIProviderName = 'anthropic' | 'openai' | 'ollama';
 export type CodingAgentName = 'claude' | 'cursor' | 'codex';

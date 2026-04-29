@@ -873,28 +873,66 @@ planr checklist reset
 
 ---
 
-### `planr rules generate`
+### `planr init`
 
-Generate AI agent rule files for Cursor, Claude Code, and/or Codex.
+Initialize Planr in the current project. Sets up `.planr/`, picks an AI provider, asks for your default coding agent, and **auto-generates AI agent rule files for the runtime(s) you target**.
 
 ```bash
-planr rules generate                  # all configured targets
-planr rules generate --target cursor  # cursor only
-planr rules generate --dry-run        # preview without writing
+planr init                                # interactive — defaults include pipeline rules
+planr init --name my-project --yes        # non-interactive — accepts all defaults (incl. pipeline rules)
+planr init --no-pipeline-rules --yes      # non-interactive, agile-only (skip pipeline rules)
+planr init --no-ai --yes                  # non-interactive, no AI provider, agile + pipeline rules
 ```
 
-| Option              | Description                           | Default |
-| ------------------- | ------------------------------------- | ------- |
-| `--target <target>` | `cursor`, `claude`, `codex`, or `all` | `all`   |
-| `--dry-run`         | Show what would be generated          | `false` |
+| Option                  | Description                                                                | Default                     |
+| ----------------------- | -------------------------------------------------------------------------- | --------------------------- |
+| `--name <name>`         | Project name                                                               | basename of cwd             |
+| `--no-ai`               | Skip AI provider setup                                                     | AI prompt enabled           |
+| `--no-pipeline-rules`   | Skip openplanr-pipeline rules (agile rules only)                           | Pipeline rules generated    |
+| `--yes` / `-y`          | Non-interactive mode (accept all defaults)                                 | Interactive                 |
 
-**Generated files by target:**
+**Why pipeline rules are on by default:** with them, `planr init` produces a complete, ready-to-use cross-runtime project. Cursor picks up `.cursor/rules/openplanr-pipeline.mdc` automatically; Codex's `AGENTS.md` includes the pipeline orchestration section; Claude Code's `CLAUDE.md` gets the pipeline block. **One command — every runtime activates the spec-driven workflow without further setup.**
 
-| Target | Output                                    |
-| ------ | ----------------------------------------- |
-| Cursor | `.cursor/rules/200x-*.mdc` (6 rule files) |
-| Claude | `CLAUDE.md`                               |
-| Codex  | `AGENTS.md`                               |
+If you only want agile mode (epic → feature → story → task), pass `--no-pipeline-rules` to skip the pipeline file set.
+
+---
+
+### `planr rules generate`
+
+Generate AI agent rule files for Cursor, Claude Code, and/or Codex. Two flags: **`--target`** (which runtime) and **`--scope`** (which workflow — agile or pipeline).
+
+```bash
+planr rules generate                                       # all targets, agile scope (default)
+planr rules generate --target cursor                       # cursor only, agile scope
+planr rules generate --target cursor --scope pipeline      # cursor pipeline rules (Cursor adapter for openplanr-pipeline)
+planr rules generate --target codex --scope pipeline       # AGENTS.md with pipeline orchestration section
+planr rules generate --target all --scope all              # everything for everyone
+planr rules generate --dry-run                             # preview without writing
+```
+
+| Option              | Description                                       | Default |
+| ------------------- | ------------------------------------------------- | ------- |
+| `--target <target>` | `cursor`, `claude`, `codex`, or `all`             | `all`   |
+| `--scope <scope>`   | `agile`, `pipeline`, or `all`                     | `agile` |
+| `--dry-run`         | Show what would be generated                      | `false` |
+
+**`--scope agile` (default — preserves existing behaviour):** generates the agile-mode rules for epic → feature → story → task workflows.
+
+**`--scope pipeline`:** generates rule files that drive the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) two-phase spec-driven workflow on the chosen runtime. Cross-runtime parity with the Claude Code plugin.
+
+**Generated files by `target × scope`:**
+
+| Target × Scope          | Output                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `cursor` × `agile`      | `.cursor/rules/{agile-checklist,create-epic,create-features,create-user-story,create-task-list,implement-task-list}.mdc` (6 files) |
+| `cursor` × `pipeline`   | `.cursor/rules/openplanr-pipeline.mdc` + `openplanr-pipeline-{plan,ship}.mdc` + `agents/{8 role bodies}.md`   |
+| `claude` × `agile`      | `CLAUDE.md` (agile context-gathering protocol)                                                                |
+| `claude` × `pipeline`   | `CLAUDE.md` (with pipeline block) + sibling `openplanr-pipeline.md` reference card                            |
+| `codex` × `agile`       | `AGENTS.md` (agile context)                                                                                   |
+| `codex` × `pipeline`    | `AGENTS.md` with `## OpenPlanr Pipeline Orchestration` section                                                |
+| `* × all`               | Both scopes side-by-side                                                                                      |
+
+**Cross-runtime support:** the same OpenPlanr Protocol v1.0.0 runs on Claude Code (canonical, with manifest-enforced subagents), Cursor (via Composer subagent dispatch), and Codex (via persona role-shift). See [`openplanr-pipeline/docs/compatibility-matrix.md`](https://github.com/openplanr/openplanr-pipeline/blob/main/docs/compatibility-matrix.md) for the full parity table.
 
 ---
 
