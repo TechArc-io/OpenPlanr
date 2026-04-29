@@ -10,6 +10,28 @@ export const CONFIG_FILENAME = '.planr/config.json';
 export const DEFAULT_AGILE_DIR = '.planr';
 export const DEFAULT_CURSOR_RULES_DIR = '.cursor/rules';
 
+/**
+ * OpenPlanr Protocol version that the `--scope pipeline` rule generators
+ * conform to. The protocol is the runtime-agnostic contract for spec-driven
+ * mode artifacts (SPEC, US, Task schemas; PLAN/SHIP command contracts; agent
+ * roles). Bumps RARELY — only on artifact-schema breaks or workflow
+ * contract changes, NOT on pipeline plugin patches.
+ *
+ * NOT to be confused with the openplanr-pipeline plugin version (which moves
+ * fast and is tracked in the marketplace pin file, not here). Generated rule
+ * files reference the protocol contract; the runtime adapter (Claude Code
+ * plugin / Cursor MDC / Codex AGENTS.md) writes its own actual version into
+ * the `.pipeline-shipped` marker at execution time.
+ *
+ * Read by:
+ *   - CursorGenerator (renders into Cursor MDC headers)
+ *   - ClaudeGenerator (renders into the sibling `openplanr-pipeline.md` reference card)
+ *   - CodexGenerator  (renders into the AGENTS.md pipeline section)
+ *
+ * See `openplanr-pipeline/docs/protocol/` for the full protocol spec.
+ */
+export const OPENPLANR_PROTOCOL_VERSION = '1.0.0';
+
 export const ARTIFACT_DIRS = {
   epics: 'epics',
   features: 'features',

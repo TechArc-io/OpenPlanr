@@ -94,10 +94,14 @@ planr plan --epic EPIC-001          # cascade from an existing epic
 | Codex  | `AGENTS.md`           | OpenAI Codex CLI |
 
 ```bash
-planr rules generate                  # all targets
-planr rules generate --target cursor  # cursor only
-planr rules generate --dry-run        # preview
+planr rules generate                                  # all targets, agile scope (default)
+planr rules generate --target cursor                  # cursor only
+planr rules generate --target cursor --scope pipeline # cursor + openplanr-pipeline rules
+planr rules generate --target all --scope all         # everything for every runtime
+planr rules generate --dry-run                        # preview
 ```
+
+**Pipeline scope:** the `--scope pipeline` flag generates rule files that drive the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) two-phase spec-driven workflow on the chosen runtime. Same workflow on Claude Code, Cursor, and Codex — same artifacts, same `.pipeline-shipped` proof markers. See [docs/CLI.md](docs/CLI.md) for the full target × scope matrix.
 
 ## Commands
 
