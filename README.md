@@ -1,303 +1,291 @@
+<div align="center">
+
 # OpenPlanr
 
-[![npm version](https://img.shields.io/npm/v/openplanr.svg)](https://www.npmjs.com/package/openplanr)
-[![license](https://img.shields.io/npm/l/openplanr.svg)](https://github.com/openplanr/OpenPlanr/blob/main/LICENSE)
-[![node](https://img.shields.io/node/v/openplanr.svg)](https://nodejs.org)
+### The planning layer for AI coding agents
 
-**Website:** [openplanr.dev](https://openplanr.dev)
+**Plan once. Ship with agents.** Works natively on **Claude Code**, **Cursor**, and **Codex** via the runtime-agnostic [OpenPlanr Protocol v1.0.0](https://github.com/openplanr/openplanr-pipeline/tree/main/docs/protocol).
 
-**AI-powered planning CLI for developers.** Capture ideas, plan sprints, generate tasks, estimate effort, and sync with GitHub or Linear — all from your terminal.
+[![npm version](https://img.shields.io/npm/v/openplanr.svg?style=flat-square&color=cb3837&logo=npm)](https://www.npmjs.com/package/openplanr)
+[![node](https://img.shields.io/node/v/openplanr.svg?style=flat-square&color=339933&logo=node.js&logoColor=white)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/openplanr.svg?style=flat-square&color=blue)](https://github.com/openplanr/OpenPlanr/blob/main/LICENSE)
+[![protocol](https://img.shields.io/badge/protocol-v1.0.0-7c3aed?style=flat-square)](https://github.com/openplanr/openplanr-pipeline/tree/main/docs/protocol)
+[![runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Cursor%20%7C%20Codex-f97316?style=flat-square)](https://github.com/openplanr/openplanr-pipeline/blob/main/docs/compatibility-matrix.md)
 
-Planr replaces heavyweight project management tools with a fast, file-based workflow. Artifacts live in your repo as markdown, version-controlled alongside your code. AI generates structured plans and teaches your coding agent (Cursor, Claude Code, Codex) how to follow them.
+**[Website](https://openplanr.dev)** · **[Pipeline plugin](https://github.com/openplanr/openplanr-pipeline)** · **[Compatibility matrix](https://github.com/openplanr/openplanr-pipeline/blob/main/docs/compatibility-matrix.md)** · **[Protocol spec](https://github.com/openplanr/openplanr-pipeline/tree/main/docs/protocol)** · **[CLI reference](docs/CLI.md)**
+
+</div>
 
 ---
 
-## Why Planr?
-
-AI coding assistants are powerful but lack structured planning. Without a clear plan, they generate code that drifts from requirements. Planr solves this by:
-
-1. **Capturing ideas instantly** — `planr backlog add` captures work items without breaking your flow
-2. **Structuring your planning** — epics, features, stories, and tasks in markdown
-3. **Sprint planning** — time-boxed iterations with velocity tracking and AI task selection
-4. **Reusable patterns** — task templates for common workflows (REST endpoints, React components, etc.)
-5. **AI-powered estimation** — story points, effort hours, and complexity analysis
-6. **Generating AI rules** — rule files that give your AI assistant context about the plan
-7. **GitHub integration** — push artifacts to issues, bi-directional sync, export reports
-8. **Linear integration** — push any artifact (epic / feature / story / task / quick-task / backlog) to Linear with `planr linear push <id>`, with flexible epic mappings (project / milestone / label) and bidirectional status + checkbox sync
-9. **Keeping everything in your repo** — artifacts live alongside your code, version-controlled
-
-## Quick Start
+`planr` is a Node CLI that authors structured plans (epics, features, stories, tasks, or full specs) as markdown in your repo, then generates runtime-native rule files so your AI coding agent picks up the plan automatically. One command to install, one command to initialise — your runtime activates the workflow without further setup.
 
 ```bash
-# Install globally
 npm install -g openplanr
-
-# Initialize in your project
 cd my-project
 planr init
-
-# Capture an idea
-planr backlog add "add user profiles" --priority high --tag feature
-
-# Or jump straight into planning
-planr epic create
-planr feature create --epic EPIC-001
-planr story create --feature FEAT-001
-planr task create --feature FEAT-001
-
-# Generate tasks from a template
-planr template use rest-endpoint --title "User Profile API"
-
-# Start a sprint
-planr sprint create --name "Sprint 1" --duration 2w
-planr sprint add TASK-001 QT-001
-
-# Generate AI rules for your editor
-planr rules generate
-```
-
-## How It Works
-
-```text
-Backlog → Agile Hierarchy → Sprint → Implementation
-
-planr backlog add "..."              # Capture ideas as they come
-planr backlog prioritize             # AI sorts by impact/effort
-planr backlog promote BL-001 --quick # Move to task when ready
-
-planr init
-  └── planr epic create                         # Define the big picture
-       └── planr feature create --epic EPIC-001
-            └── planr story create --feature FEAT-001
-                 └── planr task create --feature FEAT-001
-
-planr sprint create --name "Sprint 1" --duration 2w
-planr sprint add TASK-001 QT-001     # Assign tasks (or --auto for AI)
-planr sprint status                  # Track progress
-
-planr rules generate                 # Generate .cursor/rules, CLAUDE.md, AGENTS.md
-```
-
-Or use `planr plan` to run the full agile flow in a single command:
-
-```bash
-planr plan                          # start from scratch
-planr plan --epic EPIC-001          # cascade from an existing epic
-```
-
-## Supported AI Targets
-
-| Target | Generated File(s)     | Used By          |
-| ------ | --------------------- | ---------------- |
-| Cursor | `.cursor/rules/*.mdc` | Cursor IDE       |
-| Claude | `CLAUDE.md`           | Claude Code CLI  |
-| Codex  | `AGENTS.md`           | OpenAI Codex CLI |
-
-`planr init` **auto-generates rules for all three runtimes by default** — including the openplanr-pipeline spec-driven workflow rules. Single command, every runtime activated:
-
-```bash
-npm i -g openplanr
-cd my-project
-planr init                                  # interactive — defaults include pipeline rules
 # ✓ Created .planr/config.json
 # ✓ Generated 17 AI agent rule file(s) (scope: all)
 # ✓ Open Cursor / Codex / Claude Code — pipeline workflow is live
 ```
 
-If you want to regenerate later or scope to one runtime / workflow:
+That's the whole onboarding.
+
+---
+
+## Why OpenPlanr?
+
+AI coding agents are powerful but lack structured planning context. Without a clear plan, they generate code that drifts from requirements, churn on the same problem across sessions, and can't be audited. OpenPlanr fixes this with four properties:
+
+1. **Markdown artifacts in your repo** — plans live next to your code, version-controlled, gittable, gradable. No external SaaS, no DB.
+2. **One contract, every runtime** — author once; Claude Code, Cursor, and Codex all consume the same artifacts via [OpenPlanr Protocol v1.0.0](https://github.com/openplanr/openplanr-pipeline/tree/main/docs/protocol).
+3. **Three planning postures** — pick the ceremony level that matches the work: agile (epic → feature → story → task), quick task (one-off chores), or spec-driven (handoff to an AI factory).
+4. **Hard rules at the tool layer** — when paired with the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) Claude Code plugin, agent tool restrictions are enforced in the manifest, not just the prompt. Production-grade audit trail via the `.pipeline-shipped` execution marker.
+
+---
+
+## Three planning postures
+
+| Posture | Best for | Output |
+|---|---|---|
+| **Agile** | Real teams, sprints, multi-stakeholder work | `.planr/{epics,features,stories,tasks,sprints}/*.md` + Gherkin |
+| **Quick task** | Solo dev, one-off chores, no ceremony | `.planr/quick/QT-NNN-*.md` (a single checklist file) |
+| **Spec-driven** | Handing a feature to an AI agent factory | `.planr/specs/SPEC-NNN-{slug}/{stories,tasks,design}/` |
+
+Pick one per project, mix per task. The spec-driven posture is the bridge to the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) — same artifact contract, no conversion adapter.
+
+---
+
+## Cross-runtime support
+
+`planr init` auto-generates rule files for all three runtimes by default. Each tool is **self-sufficient after a single install**:
+
+| Runtime | What gets installed | How the workflow activates |
+|---|---|---|
+| **Claude Code** | `CLAUDE.md` + sibling `openplanr-pipeline.md` reference card. Optional: install the `openplanr-pipeline` plugin for full manifest-enforced subagents. | `/openplanr-pipeline:plan {feature}` and `/openplanr-pipeline:ship {feature}` slash commands |
+| **Cursor** | `.cursor/rules/openplanr-pipeline.mdc` + `agents/{8 role bodies}.md` | User says "plan {feature}" or "ship {feature}" — Composer dispatches the pipeline subagents |
+| **Codex** | `AGENTS.md` with `## OpenPlanr Pipeline Orchestration` section | User says "plan {feature}" — Codex adopts the role personas |
+
+Same artifacts (`.planr/specs/SPEC-NNN-{slug}/`). Same `.pipeline-shipped` proof markers. Cross-runtime spec portability works out of the box. See the [compatibility matrix](https://github.com/openplanr/openplanr-pipeline/blob/main/docs/compatibility-matrix.md) for per-capability parity.
+
+---
+
+## Quick start
+
+### Install
 
 ```bash
-planr rules generate                                  # all targets, agile scope (default)
-planr rules generate --target cursor                  # cursor only
-planr rules generate --target cursor --scope pipeline # cursor + openplanr-pipeline rules
-planr rules generate --target all --scope all         # everything for every runtime
-planr rules generate --dry-run                        # preview
+npm install -g openplanr
 ```
 
-**Pipeline scope:** the `--scope pipeline` flag generates rule files that drive the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) two-phase spec-driven workflow on the chosen runtime. Same workflow on Claude Code, Cursor, and Codex — same artifacts, same `.pipeline-shipped` proof markers. See [docs/CLI.md](docs/CLI.md) for the full target × scope matrix.
+### Initialise a project
+
+```bash
+cd my-project
+planr init
+# Interactive: pick AI provider, pick coding agent, generate rules → done
+```
+
+Non-interactive variants:
+
+```bash
+planr init --yes                       # accept all defaults (AI on, all rules)
+planr init --no-ai --yes               # skip AI provider setup
+planr init --no-pipeline-rules --yes   # agile rules only (skip pipeline workflow)
+```
+
+### Pick a posture and start
+
+**Agile:**
+
+```bash
+planr epic create
+planr feature create --epic EPIC-001
+planr story create --feature FEAT-001
+planr task create --feature FEAT-001
+# Or one-shot:
+planr plan --epic EPIC-001
+```
+
+**Quick task:**
+
+```bash
+planr quick create "add OAuth login"
+```
+
+**Spec-driven (with the pipeline plugin):**
+
+```bash
+planr spec create "Auth flow" --slug auth
+planr spec shape SPEC-001              # 4 questions, no $EDITOR
+# Then in Claude Code / Cursor / Codex:
+#   /openplanr-pipeline:plan auth      → human review → /openplanr-pipeline:ship auth
+```
+
+---
 
 ## Commands
 
+### Spec-driven mode
+
+Third planning posture — designed for handing features to AI coding agents. Specs decompose into User Stories and Tasks with explicit file Create / Modify / Preserve lists, `Type: UI | Tech`, agent assignment, and DoD with build / test commands. Schema matches [OpenPlanr Protocol v1.0.0](https://github.com/openplanr/openplanr-pipeline/tree/main/docs/protocol).
+
+| Command | Description |
+|---|---|
+| `planr spec init` | Activate spec-driven mode (creates `.planr/specs/`) |
+| `planr spec create "Auth flow"` | Create a self-contained `SPEC-NNN-{slug}/` directory |
+| `planr spec shape <id>` | Interactive 4-question authoring (Context, Functional Reqs, Business Rules, Acceptance) |
+| `planr spec decompose <id>` | AI-driven decomposition into US + Tasks |
+| `planr spec sync [<id>]` | Validate integrity (orphans, missing `specId`, schema drift); auto-fixes safe issues |
+| `planr spec list` | List all specs with status + decomposition counts |
+| `planr spec show <id>` | Print a spec + its US/Task tree |
+| `planr spec status [<id>]` | Decomposition state across one/all specs |
+| `planr spec destroy <id>` | Remove a spec entirely |
+| `planr spec attach-design <id> --files <png>...` | Attach UI mockups for the designer-agent |
+| `planr spec promote <id>` | Validate + print the pipeline handoff command |
+
+### Agile hierarchy
+
+| Command | Description |
+|---|---|
+| `planr epic create` | Create a new epic (supports `--file <path>` for PRDs) |
+| `planr feature create --epic <ID>` | Create features from an epic |
+| `planr story create --feature <ID>` | Create user stories from a feature |
+| `planr story create --epic <ID>` | Batch-generate stories for all features under an epic |
+| `planr task create --story <ID>` | AI task list from one story |
+| `planr task create --feature <ID>` | AI task list from all stories under a feature |
+| `planr plan` | Full automated flow: Epic → Features → Stories → Tasks |
+| `planr epic list` / `planr feature list` / `planr story list` / `planr task list` | List artifacts |
+
+### Quick tasks & templates
+
+| Command | Description |
+|---|---|
+| `planr quick create "description"` | AI-generated standalone task list |
+| `planr quick create --file spec.md` | Task list from a PRD or spec file |
+| `planr quick promote <ID> --story US-001` | Move into agile hierarchy |
+| `planr template list` | List built-in and custom templates |
+| `planr template use rest-endpoint --title "User API"` | Generate tasks from a template |
+| `planr template save TASK-001 --name my-pattern` | Save existing tasks as template |
+
+Built-in templates: `rest-endpoint`, `react-component`, `database-migration`, `api-integration`, `auth-flow`.
+
 ### Backlog & Sprint
 
-| Command                                               | Description                                 |
-| ----------------------------------------------------- | ------------------------------------------- |
-| `planr backlog add "desc" --priority high --tag bug`  | Capture a backlog item                      |
-| `planr backlog list --tag bug --priority high`        | List/filter backlog items                   |
-| `planr backlog prioritize`                            | AI sorts open items by impact and effort    |
-| `planr backlog promote BL-001 --quick`                | Promote to quick task or story              |
-| `planr backlog close BL-001`                          | Close/archive an item                       |
-| `planr sprint create --name "Sprint 1" --duration 2w` | Create a time-boxed sprint                  |
-| `planr sprint add TASK-001 QT-001`                    | Assign tasks to active sprint               |
-| `planr sprint add --auto`                             | AI selects tasks by priority and velocity   |
-| `planr sprint status`                                 | Progress dashboard with completion %        |
-| `planr sprint close`                                  | Archive sprint, carry over incomplete tasks |
-| `planr sprint list`                                   | List all sprints                            |
-| `planr sprint history`                                | Velocity chart across past sprints          |
+| Command | Description |
+|---|---|
+| `planr backlog add "desc" --priority high --tag bug` | Capture a backlog item |
+| `planr backlog list` / `prioritize` / `promote <id>` / `close <id>` | Manage backlog |
+| `planr sprint create --name "Sprint 1" --duration 2w` | Create a time-boxed sprint |
+| `planr sprint add TASK-001 QT-001` | Assign tasks (or `--auto` for AI) |
+| `planr sprint status` / `list` / `close` / `history` | Track sprint progress + velocity |
 
-### Agile Hierarchy
+### Planning tools
 
-| Command                             | Description                                           |
-| ----------------------------------- | ----------------------------------------------------- |
-| `planr epic create`                 | Create a new epic (supports `--file <path>` for PRDs) |
-| `planr epic list`                   | List all epics                                        |
-| `planr feature create --epic <ID>`  | Create features from an epic                          |
-| `planr feature list`                | List all features                                     |
-| `planr story create --feature <ID>` | Create user stories from a feature                    |
-| `planr story create --epic <ID>`    | Batch-generate stories for all features under an epic |
-| `planr story list`                  | List all user stories                                 |
-| `planr task create --story <ID>`    | AI task list from one story                           |
-| `planr task create --feature <ID>`  | AI task list from all stories under a feature         |
-| `planr task list`                   | List all task lists                                   |
-### Quick Tasks & Templates
+| Command | Description |
+|---|---|
+| `planr estimate <ID>` | AI effort estimation (story points, hours, complexity) |
+| `planr refine <ID>` | AI-powered review and prose polish |
+| `planr revise <ID>` | AI-driven *alignment* of planning artifacts with codebase (with diff preview) |
+| `planr search <query>` | Full-text search across all artifacts |
+| `planr sync` | Validate and fix cross-references |
+| `planr status` | Tree view of all planning progress |
 
-| Command                                               | Description                        |
-| ----------------------------------------------------- | ---------------------------------- |
-| `planr quick create "description"`                    | AI-generated standalone task list  |
-| `planr quick create --file spec.md`                   | Task list from a PRD or spec file  |
-| `planr quick promote <ID> --story US-001`             | Move into agile hierarchy          |
-| `planr template list`                                 | List built-in and custom templates |
-| `planr template use rest-endpoint --title "User API"` | Generate tasks from a template     |
-| `planr template save TASK-001 --name my-pattern`      | Save existing tasks as template    |
-| `planr template show rest-endpoint`                   | Preview template contents          |
+### AI agent rules
 
-### Spec-Driven Mode (planning *for* AI agents)
+| Command | Description |
+|---|---|
+| `planr rules generate` | Generate rule files for all configured runtimes (default scope: agile) |
+| `planr rules generate --target cursor --scope pipeline` | Cursor + pipeline workflow rules |
+| `planr rules generate --target all --scope all` | Everything for every runtime |
+| `planr rules generate --dry-run` | Preview without writing |
 
-Third planning posture alongside agile + QT. Specs decompose into User Stories
-and Tasks with the **same artifact contract as the
-[openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline)** Claude
-Code plugin — file Create/Modify/Preserve lists, Type=UI|Tech, agent
-assignment, DoD with build/test commands. Plan in `planr`, ship in the pipeline.
-See [`docs/proposals/spec-driven-mode.md`](docs/proposals/spec-driven-mode.md).
+`--scope agile` (default) writes the agile workflow rules. `--scope pipeline` writes the rule files that drive the [openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) two-phase spec-driven flow on the chosen runtime. `--scope all` produces both. `planr init` auto-runs `--scope all` by default — opt out with `planr init --no-pipeline-rules`.
 
-| Command                                                 | Description                                       |
-| ------------------------------------------------------- | ------------------------------------------------- |
-| `planr spec init`                                       | Activate spec-driven mode (creates `.planr/specs/`) |
-| `planr spec create "Auth flow"`                         | Create a self-contained `SPEC-NNN-{slug}/` directory |
-| `planr spec shape <SPEC-id>`                            | Interactive 4-question authoring (Context, Functional Reqs, Business Rules, Acceptance) |
-| `planr spec decompose <SPEC-id>`                        | AI-driven decomposition into User Stories + Tasks (matches openplanr-pipeline schema) |
-| `planr spec sync [<SPEC-id>]`                           | Validate integrity (orphaned tasks, missing `specId`, schema drift); auto-fixes safe issues |
-| `planr spec list`                                       | List all specs with status + decomposition counts |
-| `planr spec show <SPEC-id>`                             | Print a spec + its US/Task tree                   |
-| `planr spec status [<SPEC-id>]`                         | Decomposition state across one/all specs         |
-| `planr spec destroy <SPEC-id>`                          | Remove a spec entirely (clean `rm -rf`)           |
-| `planr spec attach-design <SPEC-id> --files <png>...`   | Attach UI mockups for the pipeline's designer-agent |
-| `planr spec promote <SPEC-id>`                          | Validate + print the `/openplanr-pipeline:plan {slug}` handoff |
+### Integrations
 
-### Planning Tools
+| Command | Description |
+|---|---|
+| `planr github push [ID]` | Push artifacts to GitHub Issues |
+| `planr github sync` | Bi-directional status sync with GitHub |
+| `planr github status` | Show sync status of linked artifacts |
+| `planr linear init` | Configure Linear (team + token) |
+| `planr linear push <id>` | Epic → Linear project; features / stories / tasks → issues |
+| `planr linear sync` | Pull Linear workflow state into artifact `status` |
+| `planr export --format html` | Export planning report (markdown / JSON / HTML) |
 
-| Command                | Description                                               |
-| ---------------------- | --------------------------------------------------------- |
-| `planr plan`           | Full automated flow: Epic -> Features -> Stories -> Tasks |
-| `planr estimate <ID>`  | AI effort estimation (story points, hours, complexity)    |
-| `planr refine <ID>`    | AI-powered review and improvements (prose polish)         |
-| `planr revise <ID>`    | AI-driven *alignment* of planning artifacts with codebase |
-| `planr search <query>` | Full-text search across all artifacts                     |
-| `planr sync`           | Validate and fix cross-references                         |
-| `planr status`         | Planning progress with tree view and metrics              |
+### Stakeholder reports
 
-#### `planr revise` — align planning with reality
+| Command | Description |
+|---|---|
+| `planr report <type>` | Generate a report (`sprint`, `weekly`, `executive`, `standup`, `retro`, `release`) |
+| `planr report-linter [file]` | Lint a markdown report (vague language, evidence density) |
+| `planr context --report-type weekly` | Print the report context pack as JSON |
+| `planr voice standup --file transcript.txt` | Convert a transcript into a structured standup |
 
-`refine` improves prose; `revise` actively rewrites planning artifacts so they match the codebase, sibling artifacts, and declared sources. Four-layer safety pipeline:
+Output: Markdown + HTML written to `.planr/reports/`. `--push slack` posts via webhook; `--push github` opens an issue. `--strict-evidence` fails on bullets without URLs / `#issue` refs.
 
-1. **Clean-tree gate** — git working tree must be clean (override with `--allow-dirty`)
-2. **Agent decision** — zod-validated `revise` / `skip` / `flag` per artifact
-3. **Evidence verification** — agent must cite typed, verifiable evidence (file existence, grep matches, sibling artifacts…); unverifiable citations are dropped, and a `revise` that loses all support is demoted to `flag`
-4. **Diff preview + confirmation** — per-artifact `[a]pply / [s]kip / [e]dit / [d]iff / [q]uit`; writes are atomic with sidecar backups; full audit log emitted on every run (dry-run included)
+### Setup & config
 
-```bash
-# Single artifact, interactive
-planr revise TASK-007
+| Command | Description |
+|---|---|
+| `planr init` | Initialise project (creates `.planr/`, generates rules for all runtimes by default) |
+| `planr config show` | Display current configuration + spec-driven readiness |
+| `planr config set-provider` / `set-key` / `set-model` / `set-agent` | Manage AI provider settings |
+| `planr checklist show/toggle/reset` | Agile development checklist |
 
-# Cascade top-down (epic → features → stories → tasks)
-planr revise EPIC-003 --cascade
+See [docs/CLI.md](docs/CLI.md) for the full reference with every flag.
 
-# Revise everything in the project (content-hash cache skips unchanged artifacts)
-planr revise --all --dry-run              # preview every revision
-planr revise --all --yes                  # type YES once; then non-interactive apply
+---
 
-# CI mode — dry-run + JSON audit + non-zero exit on flagged findings
-planr revise EPIC-003 --cascade --dry-run --audit-format json --audit ./revise.json
-```
+## Project structure
 
-After a successful apply, revise prints a suggested commit:
-
-```
-git commit -am "chore(plan): revise EPIC-003 against codebase"
-```
-
-Post-flight graph-integrity check runs after every non-dry-run revise. If the writes leave parent/child links broken, revise automatically rolls back via `git checkout` (which is why clean-tree is required by default). Full design in [.planr/EPIC-REVISE-COMMAND.md](.planr/EPIC-REVISE-COMMAND.md).
-
-### GitHub, Linear & export
-
-| Command                      | Description                                      |
-| ---------------------------- | ------------------------------------------------ |
-| `planr linear init`          | Save Linear team + token (PAT) for API access    |
-| `planr linear sync`          | Pull Linear workflow state into Feature/Story `status` (one-way)                |
-| `planr linear push <epicId>` | Epic → Linear project, features → issues, stories and task lists → sub-issues |
-| `planr github push [ID]`     | Push artifacts to GitHub Issues                  |
-| `planr github sync`          | Bi-directional status sync with GitHub           |
-| `planr github status`        | Show sync status of linked artifacts             |
-| `planr export --format html` | Export planning report (markdown, JSON, or HTML) |
-
-### Stakeholder reporting
-
-Generate evidence-linked status reports from your `.planr/` artifacts and (optionally) GitHub activity. See [docs/EPIC-PM-REPORTING-LAYER.md](docs/EPIC-PM-REPORTING-LAYER.md) for the full design and what is shipped vs deferred.
-
-| Command                                            | Description                                                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `planr report <type>`                              | Generate a report (`sprint`, `weekly`, `executive`, `standup`, `retro`, `release`)                |
-| `planr report weekly --lint`                       | Generate and run the report quality linter before saving                                          |
-| `planr report sprint --push slack --dry-run`       | Show what would be posted to Slack (no webhook required for dry runs)                             |
-| `planr report-linter [file]`                       | Lint an existing markdown report (vague language, evidence density, required sections)            |
-| `planr context --report-type weekly`               | Print the report context pack (artifacts + GitHub + evidence) as JSON for piping                  |
-| `planr voice standup --file transcript.txt --lint` | Convert a transcript into a structured standup, optionally linted, edited, or appended to a story |
-| `planr story standup --story US-001 --file t.txt`  | Append linted standup notes from a transcript onto an existing user story                         |
-
-**Output:** Markdown + HTML, written to `.planr/reports/<type>-<timestamp>.{md,html}` (override with `--output`). PDF rendering is intentionally out of scope for v1; `--format pdf` exits with a clear message.
-
-**Distribution:** `--push slack` posts via an [Incoming Webhook](https://api.slack.com/messaging/webhooks) configured at `distribution.slackWebhookUrl` in `.planr/config.json`. `--push github` opens a `planr:report` issue using the local `gh` CLI.
-
-**Quality gates:** `--strict-evidence` fails when substantive bullets under `##` sections (except the **Evidence** appendix) are missing URLs or `#issue` refs; full-line italic placeholders like `_Add links…_` are skipped. `--lint` runs configurable rules (extend or override via `reportLinter` in `.planr/config.json`).
-
-### Setup & config commands
-
-| Command                             | Description                                            |
-| ----------------------------------- | ------------------------------------------------------ |
-| `planr init`                        | Initialize project with config and directory structure |
-| `planr config show`                 | Display current configuration                          |
-| `planr config set-provider`         | Set AI provider (anthropic, openai, ollama)            |
-| `planr config set-key`              | Store API key securely                                 |
-| `planr config set-model`            | Set AI model                                           |
-| `planr config set-agent`            | Set default coding agent                               |
-| `planr rules generate`              | Generate AI agent rule files                           |
-| `planr checklist show/toggle/reset` | Agile development checklist                            |
-
-See [docs/CLI.md](docs/CLI.md) for the full command reference with all options and flags.
-
-## Project Structure
-
-After running `planr init` and creating artifacts:
+After `planr init` and creating artifacts:
 
 ```text
 my-project/
 ├── .planr/
-│   ├── config.json     # Project configuration
-│   ├── epics/          # EPIC-001-*.md
-│   ├── features/       # FEAT-001-*.md
-│   ├── stories/        # US-001-*.md + US-001-gherkin.feature
-│   ├── tasks/          # TASK-001-*.md
-│   ├── quick/          # QT-001-*.md
-│   ├── backlog/        # BL-001-*.md
-│   ├── sprints/        # SPRINT-001-*.md
-│   ├── templates/      # Custom task templates
-│   ├── adrs/           # Architecture Decision Records
-│   ├── checklists/     # Agile development checklist
-│   └── diagrams/       # UML, C4, sequence diagrams
-├── .cursor/rules/      # Generated Cursor rules
-├── CLAUDE.md           # Generated Claude Code rules
-└── AGENTS.md           # Generated Codex rules
+│   ├── config.json              # Project configuration
+│   ├── epics/                   # EPIC-001-*.md
+│   ├── features/                # FEAT-001-*.md
+│   ├── stories/                 # US-001-*.md + US-001-gherkin.feature
+│   ├── tasks/                   # TASK-001-*.md
+│   ├── quick/                   # QT-001-*.md
+│   ├── specs/                   # SPEC-NNN-{slug}/ (spec-driven mode)
+│   ├── backlog/                 # BL-001-*.md
+│   ├── sprints/                 # SPRINT-001-*.md
+│   ├── adrs/                    # Architecture Decision Records
+│   ├── reports/                 # Stakeholder reports
+│   └── checklists/              # Agile development checklist
+├── .cursor/rules/
+│   ├── agile-checklist.mdc      # Agile workflow rules
+│   ├── openplanr-pipeline.mdc   # Pipeline rules (default-on)
+│   └── agents/                  # 8 subagent body files
+├── CLAUDE.md                    # Claude Code rules
+├── openplanr-pipeline.md        # Pipeline reference card (Claude Code)
+└── AGENTS.md                    # Codex rules + pipeline orchestration
 ```
+
+---
+
+## Architecture decision: `planr revise`
+
+Most planning tools let plans drift from the codebase. `planr revise` actively rewrites planning artifacts so they match reality, with a four-layer safety pipeline:
+
+1. **Clean-tree gate** — git working tree must be clean (`--allow-dirty` to override)
+2. **Agent decision** — zod-validated `revise` / `skip` / `flag` per artifact
+3. **Evidence verification** — agent must cite typed, verifiable evidence (file existence, grep matches, sibling artifacts); unverifiable citations are dropped
+4. **Diff preview + confirmation** — per-artifact `[a]pply / [s]kip / [e]dit / [d]iff / [q]uit`; writes are atomic with sidecar backups
+
+```bash
+planr revise EPIC-003 --cascade           # interactive
+planr revise --all --dry-run              # preview every revision
+planr revise EPIC-003 --cascade --dry-run --audit ./revise.json   # CI mode
+```
+
+Full design: [.planr/EPIC-REVISE-COMMAND.md](.planr/EPIC-REVISE-COMMAND.md).
+
+---
 
 ## Configuration
 
@@ -314,61 +302,62 @@ my-project/
     "codexConfig": "."
   },
   "idPrefix": {
-    "epic": "EPIC",
-    "feature": "FEAT",
-    "story": "US",
-    "task": "TASK",
-    "quick": "QT",
-    "backlog": "BL",
-    "sprint": "SPRINT"
+    "epic": "EPIC", "feature": "FEAT", "story": "US",
+    "task": "TASK", "quick": "QT", "backlog": "BL",
+    "sprint": "SPRINT", "spec": "SPEC"
   }
 }
 ```
 
-## Built-in Task Templates
+---
 
-| Template             | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `rest-endpoint`      | CRUD endpoint with validation, auth, tests, docs        |
-| `react-component`    | Component, stories, tests, types                        |
-| `database-migration` | Schema change, migration, rollback, seed data           |
-| `api-integration`    | External API client, retry logic, error handling, tests |
-| `auth-flow`          | Authentication flow with login, signup, password reset  |
+## Ecosystem
 
-```bash
-planr template use rest-endpoint --title "User Profile API"
-```
+OpenPlanr is one of four components:
+
+| Component | Role | Repo |
+|---|---|---|
+| **`planr` CLI** | Authoring surface — generates `.planr/` artifacts and runtime rule files | this repo |
+| **`openplanr-pipeline`** | Claude Code plugin — canonical executor (8 subagents, manifest-enforced tool restrictions) | [openplanr/openplanr-pipeline](https://github.com/openplanr/openplanr-pipeline) |
+| **`openplanr` skill** | Routing playbook — teaches Claude when to use which surface | [openplanr/skills](https://github.com/openplanr/skills) |
+| **`openplanr/marketplace`** | Distribution — Claude Code plugin registry | [openplanr/marketplace](https://github.com/openplanr/marketplace) |
+
+planr CLI is the only piece you need to install for Cursor and Codex. Add the marketplace + pipeline plugin for the full Claude Code experience.
+
+---
 
 ## Development
 
 ```bash
-# Clone and install
 git clone https://github.com/openplanr/OpenPlanr.git
-cd openplanr
+cd OpenPlanr
 npm install
 
 # Run from source
 npx tsx src/cli/index.ts init
 
-# Build
+# Build / test / lint
 npm run build
-
-# Run tests
 npm test
+npx biome check src/ tests/
 
 # Link globally for development
 npm install -g .
 ```
 
+---
+
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feat/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feat/amazing-feature`)
+3. Commit your changes
+4. Push to the branch
 5. Open a Pull Request
+
+---
 
 ## License
 
